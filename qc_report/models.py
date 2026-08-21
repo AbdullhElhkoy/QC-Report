@@ -122,6 +122,8 @@ class SOPLineItem(models.Model):
     dom = models.DecimalField("DOM", max_digits=10, decimal_places=2, default=0)
     std = models.DecimalField("STD", max_digits=10, decimal_places=2, default=0)
     nc = models.DecimalField("NC", max_digits=10, decimal_places=2, default=0)
+    cause = models.CharField("Cause", max_length=200, blank=True)
+    note = models.CharField("Note", max_length=200, blank=True)
     defect_reason = models.CharField("سبب العيب", max_length=100, blank=True)
     notes = models.TextField("ملاحظات", blank=True)
     car_number = models.PositiveIntegerField("رقم العربية", null=True, blank=True)

@@ -32,12 +32,16 @@ def _pct(part, whole):
     return (Decimal(part) / Decimal(whole)) * 100
 
 
-def _entries_for_date(unit, date):
-    return ShiftEntry.objects.filter(unit=unit, entry_date=date)
+def _normalize_range(start, end):
+    """تطبيع فترة التجميع: لو مفيش تاريخ نهاية تبقى فترة يوم واحد."""
+    return start, end or start
 
 
-def sop_section(date):
-    entries = ShiftEntry.objects.filter(unit__in=SOP_UNITS, entry_date=date)
+def sop_section(start, end=None):
+    start, end = _normalize_range(start, end)
+    entries = ShiftEntry.objects.filter(
+        unit__in=SOP_UNITS, entry_date__range=(start, end)
+    )
     items = SOPLineItem.objects.filter(shift_entry__in=entries)
     rows = []
     grand = {"exp": ZERO, "dom": ZERO, "std": ZERO, "nc": ZERO}
@@ -53,6 +57,13 @@ def sop_section(date):
             nc = sum((i.nc for i in pt_items), ZERO)
             total = exp + dom + std
             unit_total += total
+            # نصوص Cause وNote من كل الأيام داخل الفترة، مدموجة بفاصل &
+            texts = [
+                t
+                for i in pt_items
+                for t in (getattr(i, "cause", ""), getattr(i, "note", ""))
+                if t
+            ]
             product_rows.append(
                 {
                     "product_type": ProductType(pt).label,
@@ -61,6 +72,7 @@ def sop_section(date):
                     "std": std,
                     "nc": nc,
                     "total": total,
+                    "texts": " & ".join(texts),
                 }
             )
             if unit != Unit.C_PACKING:
@@ -103,8 +115,9 @@ def sop_section(date):
     }
 
 
-def dcp_section(date):
-    entries = ShiftEntry.objects.filter(unit="DCP", entry_date=date)
+def dcp_section(start, end=None):
+    start, end = _normalize_range(start, end)
+    entries = ShiftEntry.objects.filter(unit="DCP", entry_date__range=(start, end))
     summary = DCPSummary.objects.filter(shift_entry__in=entries).aggregate(
         bb_total=Sum("bb_total"),
         as_sb_total=Sum("as_sb_total"),
@@ -154,7 +167,7 @@ def dcp_section(date):
         green=Sum("green"),
     )
     notes = list(
-        ShiftEntry.objects.filter(unit="DCP", entry_date=date)
+        ShiftEntry.objects.filter(unit="DCP", entry_date__range=(start, end))
         .exclude(general_notes="")
         .values_list("general_notes", flat=True)
     )
@@ -168,8 +181,11 @@ def dcp_section(date):
     }
 
 
-def pa_section(date):
-    agg = PALineItem.objects.filter(shift_entry__unit="PA", shift_entry__entry_date=date).aggregate(
+def pa_section(start, end=None):
+    start, end = _normalize_range(start, end)
+    agg = PALineItem.objects.filter(
+        shift_entry__unit="PA", shift_entry__entry_date__range=(start, end)
+    ).aggregate(
         jc_43=Sum("jc_43"), jc_62=Sum("jc_62"), cube_43=Sum("cube_43"), cube_61=Sum("cube_61")
     )
     values = {k: v or ZERO for k, v in agg.items()}
@@ -177,18 +193,20 @@ def pa_section(date):
     return values
 
 
-def sa_section(date):
+def sa_section(start, end=None):
+    start, end = _normalize_range(start, end)
     value = SALineItem.objects.filter(
-        shift_entry__unit="SA", shift_entry__entry_date=date
+        shift_entry__unit="SA", shift_entry__entry_date__range=(start, end)
     ).aggregate(jc=Sum("jc"))["jc"] or ZERO
     return {"jc": value}
 
 
-def gcc_section(date):
+def gcc_section(start, end=None):
+    start, end = _normalize_range(start, end)
     units_data = []
     for unit in ("GCC1", "GCC2"):
         items = GCCLineItem.objects.filter(
-            shift_entry__unit=unit, shift_entry__entry_date=date
+            shift_entry__unit=unit, shift_entry__entry_date__range=(start, end)
         )
         package_rows = []
         unit_totals = {"green": 0, "yellow": 0, "white": 0, "blue": 0}
@@ -217,9 +235,10 @@ def gcc_section(date):
     return units_data
 
 
-def loading_section(date):
+def loading_section(start, end=None):
+    start, end = _normalize_range(start, end)
     items = LoadingLineItem.objects.filter(
-        shift_entry__unit="LOADING", shift_entry__entry_date=date
+        shift_entry__unit="LOADING", shift_entry__entry_date__range=(start, end)
     )
     rows = []
     grand = ZERO
@@ -233,30 +252,32 @@ def loading_section(date):
     return {"rows": rows, "grand_total": grand}
 
 
-def charts_data(date):
+def charts_data(start, end=None):
+    start, end = _normalize_range(start, end)
+    date_filter = {"shift_entry__entry_date__range": (start, end)}
     sop_qty = (
         SOPLineItem.objects.filter(
             shift_entry__unit__in=["SOP_A", "SOP_B", "SOP_C", "SOP_D"],
-            shift_entry__entry_date=date,
+            **date_filter,
         ).aggregate(qty=Sum("exp") + Sum("dom") + Sum("std"))["qty"]
         or ZERO
     )
     gsop_qty = (
         SOPLineItem.objects.filter(
-            shift_entry__unit="G_SOP", shift_entry__entry_date=date
+            shift_entry__unit="G_SOP", **date_filter
         ).aggregate(qty=Sum("exp") + Sum("dom") + Sum("std"))["qty"]
         or ZERO
     )
     cp_qty = (
         SOPLineItem.objects.filter(
-            shift_entry__unit="C_PACKING", shift_entry__entry_date=date
+            shift_entry__unit="C_PACKING", **date_filter
         ).aggregate(qty=Sum("exp") + Sum("dom") + Sum("std"))["qty"]
         or ZERO
     )
 
     def gcc_colors(unit):
         agg = GCCLineItem.objects.filter(
-            shift_entry__unit=unit, shift_entry__entry_date=date
+            shift_entry__unit=unit, **date_filter
         ).aggregate(
             green=Sum("green"), yellow=Sum("yellow"), white=Sum("white"), blue=Sum("blue")
         )
@@ -265,12 +286,12 @@ def charts_data(date):
     dcp_chart = next(
         (
             c
-            for c in dcp_section(date)["categories"]
+            for c in dcp_section(start, end)["categories"]
             if c["category"] == ColorGradingCategory.TOTAL.label
         ),
         None,
     )
-    loading = loading_section(date)
+    loading = loading_section(start, end)
     return {
         "total_qty": {
             "labels": ["Sop", "Gsop", "C.P", "GCC1", "GCC2", "DCP", "PA", "SA"],
@@ -278,11 +299,11 @@ def charts_data(date):
                 float(sop_qty),
                 float(gsop_qty),
                 float(cp_qty),
-                float(gcc_section(date)[0]["grand_total"]),
-                float(gcc_section(date)[1]["grand_total"]),
-                float(dcp_section(date)["summary"]["total_1"]),
-                float(pa_section(date)["total"]),
-                float(sa_section(date)["jc"]),
+                float(gcc_section(start, end)[0]["grand_total"]),
+                float(gcc_section(start, end)[1]["grand_total"]),
+                float(dcp_section(start, end)["summary"]["total_1"]),
+                float(pa_section(start, end)["total"]),
+                float(sa_section(start, end)["jc"]),
             ],
         },
         "dcp": {
@@ -327,14 +348,23 @@ def charts_data(date):
     }
 
 
-def full_daily_report(date):
+def full_daily_report(date_from, date_to=None):
+    """تجميع التقرير على فترة: يوم واحد أو عدة أيام (حتى 3 أيام مثلاً)."""
+    start, end = _normalize_range(date_from, date_to)
     return {
-        "date": date,
-        "sop": sop_section(date),
-        "dcp": dcp_section(date),
-        "pa": pa_section(date),
-        "sa": sa_section(date),
-        "gcc": gcc_section(date),
-        "loading": loading_section(date),
-        "charts": charts_data(date),
+        "date": start,
+        "date_from": start,
+        "date_to": end,
+        "period_label": (
+            f"{start.strftime('%Y-%m-%d')} — {end.strftime('%Y-%m-%d')}"
+            if end != start
+            else start.strftime("%Y-%m-%d")
+        ),
+        "sop": sop_section(start, end),
+        "dcp": dcp_section(start, end),
+        "pa": pa_section(start, end),
+        "sa": sa_section(start, end),
+        "gcc": gcc_section(start, end),
+        "loading": loading_section(start, end),
+        "charts": charts_data(start, end),
     }

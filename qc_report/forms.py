@@ -58,12 +58,18 @@ class SOPLineItemForm(ZeroDefaultMixin, forms.ModelForm):
 
     class Meta:
         model = SOPLineItem
-        fields = ["exp", "dom", "std", "nc", "defect_reason", "notes", "car_number", "car_weight"]
+        fields = [
+            "exp", "dom", "std", "nc",
+            "cause", "note",
+            "defect_reason", "notes", "car_number", "car_weight",
+        ]
         widgets = {
             "notes": forms.Textarea(attrs={"rows": 1, "class": "form-control form-control-sm"}),
             "defect_reason": forms.TextInput(
                 attrs={"class": "form-control form-control-sm"}
             ),
+            "cause": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+            "note": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
         }
 
 

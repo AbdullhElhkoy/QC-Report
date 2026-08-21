@@ -506,25 +506,36 @@ def entry_done(request, unit, pk):
     )
 
 
+def _period_or_redirect(date_from, date_to):
+    """ترتيب الفترة: لو النهاية قبل البداية نعكسها."""
+    if date_from and date_to and date_to < date_from:
+        return date_to, date_from
+    return date_from, date_to
+
+
 @login_required
-def daily_report(request, date=None):
+def daily_report(request, date_from=None, date_to=None):
     if not request.user.is_manager:
         messages.error(request, "التقرير اليومي متاح للمدير فقط.")
         return redirect("dashboard")
-    report_date = date or timezone.localdate()
-    context = full_daily_report(report_date)
-    context["prev_date"] = report_date - timezone.timedelta(days=1)
-    context["next_date"] = report_date + timezone.timedelta(days=1)
+    date_from = date_from or timezone.localdate()
+    date_from, date_to = _period_or_redirect(date_from, date_to)
+    context = full_daily_report(date_from, date_to)
     context["today"] = timezone.localdate()
+    # تنقّل يوم سابق/تالي يظهر فقط في تقرير اليوم الواحد
+    if not date_to or date_to == date_from:
+        context["prev_date"] = date_from - timezone.timedelta(days=1)
+        context["next_date"] = date_from + timezone.timedelta(days=1)
     return render(request, "report.html", context)
 
 
 @login_required
-def daily_report_pdf(request, date=None):
+def daily_report_pdf(request, date_from=None, date_to=None):
     if not request.user.is_manager:
         messages.error(request, "التقرير اليومي متاح للمدير فقط.")
         return redirect("dashboard")
-    report_date = date or timezone.localdate()
+    date_from = date_from or timezone.localdate()
+    date_from, date_to = _period_or_redirect(date_from, date_to)
 
     # الاستيراد هنا (lazy import) عشان WeasyPrint يحتاج مكتبات نظام (Cairo/Pango)
     # قد لا تكون متاحة في كل بيئة، فمنعزلها عن باقي التطبيق حتى لا يفشل التشغيل كله لو غابت.
@@ -536,9 +547,9 @@ def daily_report_pdf(request, date=None):
             "خدمة PDF غير متاحة على هذه البيئة. ثبّت weasyprint ومكتبات النظام المطلوبة "
             "(Pango/Cairo) أو استخدم زر الطباعة من المتصفح.",
         )
-        return redirect("report", report_date)
+        return redirect("report", date_from)
 
-    context = full_daily_report(report_date)
+    context = full_daily_report(date_from, date_to)
     context["charts"] = generate_report_charts(context["charts"])
     context["doc_control"] = settings.QC_REPORT_DOC_CONTROL
 
@@ -547,7 +558,10 @@ def daily_report_pdf(request, date=None):
     pdf_bytes = HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
 
     response = HttpResponse(pdf_bytes, content_type="application/pdf")
-    filename = f"QC_Report_{report_date.strftime('%d-%m-%Y')}.pdf"
+    if date_to and date_to != date_from:
+        filename = f"QC_Report_{date_from.strftime('%d-%m-%Y')}_{date_to.strftime('%d-%m-%Y')}.pdf"
+    else:
+        filename = f"QC_Report_{date_from.strftime('%d-%m-%Y')}.pdf"
     response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response
 

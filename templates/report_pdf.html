@@ -110,7 +110,7 @@
     <img src="{% static 'qc_report/img/logo_evergrow_ar.png' %}" alt="">
     <div class="title">
         <h1>Quality Control Report</h1>
-        <div class="date">Date : {{ date|date:"d -n- Y" }}</div>
+        <div class="date">Date : {{ period_label }}</div>
     </div>
     <img src="{% static 'qc_report/img/logo_evergrow_en.png' %}" alt="">
 </div>
@@ -124,7 +124,7 @@
         <tr class="th-blue">
             <th colspan="2">UNIT</th>
             <th>EXP</th><th>DOM</th><th>STD</th><th>NC</th>
-            <th>Defect Reason</th><th>TOTAL</th><th>NOTES</th>
+            <th>CAUSE & NOTE</th><th>TOTAL</th>
         </tr>
     </thead>
     <tbody>
@@ -137,11 +137,10 @@
                 <td>{{ p.product_type }}</td>
                 <td>{{ p.exp }}</td><td>{{ p.dom }}</td><td>{{ p.std }}</td>
                 <td class="{% if p.nc %}cell-nc{% endif %}">{{ p.nc }}</td>
-                <td>{{ p.defect_reason|default:"" }}</td>
+                <td class="small-text">{{ p.texts|default:"" }}</td>
                 {% if forloop.first %}
                 <td rowspan="{{ unit_row.products|length }}">{{ unit_row.total }}</td>
                 {% endif %}
-                <td>{{ p.notes|default:"" }}</td>
             </tr>
             {% endfor %}
         {% endfor %}

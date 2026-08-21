@@ -28,6 +28,10 @@
             <th>DOM</th>
             <th>STD</th>
             <th>NC</th>
+            {% if unit != 'G_SOP' %}
+              <th>Cause</th>
+              <th>Note</th>
+            {% endif %}
             <th>سبب العيب</th>
             <th>ملاحظات</th>
             <th>رقم العربية</th>
@@ -42,6 +46,10 @@
               <td>{{ row.form.dom }}</td>
               <td>{{ row.form.std }}</td>
               <td>{{ row.form.nc }}</td>
+              {% if unit != 'G_SOP' %}
+                <td>{{ row.form.cause }}</td>
+                <td>{{ row.form.note }}</td>
+              {% endif %}
               <td>{{ row.form.defect_reason }}</td>
               <td>{{ row.form.notes }}</td>
               {% if row.show_car %}
