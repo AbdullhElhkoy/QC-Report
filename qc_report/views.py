@@ -39,6 +39,7 @@ from .models import (
     PackageType,
     ProductType,
     SALineItem,
+    Shift,
     ShiftEntry,
     SOPLineItem,
     SOP_PRODUCT_TYPES,
@@ -46,6 +47,41 @@ from .models import (
 )
 
 ZERO = Decimal("0")
+
+# تسلسل الورديات المتكرر خلال اليوم: أول إدخال = الأولى، تاني = الثانية، تالت = الثالثة
+SHIFT_SEQUENCE = [Shift.SHIFT_1, Shift.SHIFT_2, Shift.SHIFT_3]
+
+
+def next_shift_for(unit, entry_date):
+    """يرجّع أول وردية متاحة بالترتيب (1 ثم 2 ثم 3) لوحد معين في يوم معين،
+    أو None لو الورديات الثلاثة اتسجلت بالفعل."""
+    taken = set(
+        ShiftEntry.objects.filter(unit=unit, entry_date=entry_date).values_list(
+            "shift", flat=True
+        )
+    )
+    for s in SHIFT_SEQUENCE:
+        if s not in taken:
+            return s
+    return None
+
+
+def header_context(request, unit, entry=None):
+    """بيانات الهيدر الجاهزة تلقائياً: المستخدم، التاريخ، الوحدة، الوردية."""
+    if entry is not None:
+        return {
+            "header_user": entry.submitted_by.get_full_name()
+            or entry.submitted_by.username,
+            "header_date": entry.entry_date,
+            "header_shift": entry.get_shift_display(),
+        }
+    return {
+        "header_user": request.user.get_full_name() or request.user.username,
+        "header_date": timezone.localdate(),
+        "header_shift_label": dict(Shift.choices)[next_shift_for(unit, timezone.localdate())]
+        if next_shift_for(unit, timezone.localdate())
+        else None,
+    }
 
 SOP_UNIT_TEMPLATES = {
     "SOP_A": "entry_sop.html",
@@ -318,7 +354,16 @@ def entry_new(request, unit):
         return redirect("dashboard")
 
     today = timezone.localdate()
-    entries_today = ShiftEntry.objects.filter(unit=unit, entry_date=today)
+
+    # الوردية بتتحدد أوتوماتيك بالتسلسل: لو الورديات الثلاثة خلصت نمنع إدخال جديد
+    next_shift = next_shift_for(unit, today)
+    if next_shift is None:
+        messages.info(
+            request,
+            f"تم تسجيل ورديات اليوم الثلاثة لوحدة {unit_label(unit)} بالفعل. "
+            "لتعديل بيانات استخدم زر تعديل من لوحة التحكم.",
+        )
+        return redirect("dashboard")
 
     if request.method == "POST":
         ctx = _build_all_forms(unit, data=request.POST)
@@ -329,6 +374,9 @@ def entry_new(request, unit):
                     entry = shift_form.save(commit=False)
                     entry.unit = unit
                     entry.submitted_by = request.user
+                    # التاريخ والوردية يتحسموا على السيرفر مش من المستخدم
+                    entry.entry_date = today
+                    entry.shift = next_shift
                     entry.full_clean()
                     entry.save()
                     _save_related(entry, request.POST)
@@ -336,12 +384,13 @@ def entry_new(request, unit):
             except (IntegrityError, ValidationError):
                 shift_form.add_error(
                     None,
-                    "تم إدخال هذه الوردية بالفعل لهذا اليوم والوحدة. اختر وردية أخرى أو عدّل الإدخال الموجود.",
+                    "تم إدخال هذه الوردية بالفعل لهذا اليوم والوحدة. عدّل الإدخال الموجود.",
                 )
                 messages.warning(request, "هذا الإدخال موجود بالفعل.")
     else:
         ctx = _build_all_forms(unit)
 
+    entries_today = ShiftEntry.objects.filter(unit=unit, entry_date=today)
     existing_shifts = {e.shift: e for e in entries_today}
     return render(
         request,
@@ -352,6 +401,7 @@ def entry_new(request, unit):
             "today": today,
             "entries_today": entries_today,
             "existing_shifts": existing_shifts,
+            **header_context(request, unit),
             **ctx,
         },
     )
@@ -393,6 +443,7 @@ def entry_edit(request, unit, entry_date, shift):
             "editing": True,
             "entry": entry,
             "today": timezone.localdate(),
+            **header_context(request, unit, entry=entry),
             **ctx,
         },
     )

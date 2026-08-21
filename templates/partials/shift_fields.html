@@ -1,18 +1,28 @@
-<div class="row g-3 mb-4">
-  <div class="col-12 col-md-4">
-    <label class="form-label" for="{{ shift_form.entry_date.id_for_label }}">التاريخ</label>
-    {{ shift_form.entry_date }}
-    <small class="text-danger d-block">{{ shift_form.entry_date.errors }}</small>
-  </div>
-  <div class="col-12 col-md-4">
-    <label class="form-label d-block">الوردية</label>
-    {% for radio in shift_form.shift %}
-      <div class="form-check form-check-inline">
-        {{ radio.tag }}{{ radio.choice_label }}
+<div class="card mb-4 border-secondary">
+  <div class="card-body py-2">
+    <div class="row text-center">
+      <div class="col-6 col-md-3 border-start">
+        <small class="text-muted d-block">الموظف</small>
+        <strong>{{ header_user }}</strong>
       </div>
-    {% endfor %}
-    <small class="text-danger d-block">{{ shift_form.shift.errors }}</small>
+      <div class="col-6 col-md-3 border-start">
+        <small class="text-muted d-block">الوحدة</small>
+        <strong>{{ unit_label }}</strong>
+      </div>
+      <div class="col-6 col-md-3 border-start">
+        <small class="text-muted d-block">التاريخ</small>
+        <strong>{{ header_date|date:"Y-m-d" }}</strong>
+      </div>
+      <div class="col-6 col-md-3 border-start">
+        <small class="text-muted d-block">الوردية</small>
+        {% if header_shift %}<strong>{{ header_shift }}</strong>
+        {% elif header_shift_label %}<strong>{{ header_shift_label }}</strong>
+        {% else %}<span class="badge bg-danger">غير محددة</span>{% endif %}
+      </div>
+    </div>
   </div>
+</div>
+<div class="row g-3 mb-4">
   <div class="col-12">
     <label class="form-label" for="{{ shift_form.general_notes.id_for_label }}">ملاحظات عامة</label>
     {{ shift_form.general_notes }}

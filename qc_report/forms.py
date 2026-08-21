@@ -21,9 +21,8 @@ INTEGER_ATTRS = {"type": "number", "step": "1", "min": "0", "class": "form-contr
 class ShiftEntryForm(forms.ModelForm):
     class Meta:
         model = ShiftEntry
-        fields = ["entry_date", "shift", "general_notes"]
+        fields = ["general_notes"]
         widgets = {
-            "entry_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "general_notes": forms.Textarea(attrs={"rows": 2, "class": "form-control"}),
         }
 
