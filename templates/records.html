@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}سجل الإدخالات — QC Report{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">سجل الإدخالات <span class="badge bg-secondary">{{ total }}</span></h1>
+</div>
+
+<form method="get" class="card card-body mb-3 no-print">
+  <div class="row g-2 align-items-end">
+    <div class="col-6 col-md-3">
+      <label class="form-label" for="unit">الوحدة</label>
+      <select name="unit" id="unit" class="form-select">
+        <option value="">كل الوحدات</option>
+        {% for value, label in units %}
+          <option value="{{ value }}" {% if sel_unit == value %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label" for="from">من تاريخ</label>
+      <input type="date" name="from" id="from" class="form-control" value="{{ date_from }}">
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label" for="to">إلى تاريخ</label>
+      <input type="date" name="to" id="to" class="form-control" value="{{ date_to }}">
+    </div>
+    <div class="col-6 col-md-3 d-flex gap-2">
+      <button type="submit" class="btn btn-primary flex-fill">تصفية</button>
+      <a href="{% url 'records' %}" class="btn btn-outline-secondary flex-fill">مسح</a>
+    </div>
+  </div>
+</form>
+
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover table-striped align-middle mb-0">
+      <thead class="table-light">
+        <tr>
+          <th>التاريخ</th>
+          <th>الوردية</th>
+          <th>الوحدة</th>
+          <th>الموظف</th>
+          <th class="text-center no-print">إجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in page_obj.object_list %}
+          <tr>
+            <td>{{ e.entry_date|date:"Y-m-d" }}</td>
+            <td><span class="badge bg-info text-dark">{{ e.get_shift_display }}</span></td>
+            <td>{{ e.get_unit_display }}</td>
+            <td>{{ e.submitted_by.get_full_name|default:e.submitted_by.username }}</td>
+            <td class="text-center no-print">
+              <a href="{% url 'record_detail' e.pk %}" class="btn btn-sm btn-outline-primary">عرض</a>
+              {% if user.is_manager or e.submitted_by == user %}
+                <a href="{% url 'entry_edit' e.unit e.entry_date e.shift %}"
+                   class="btn btn-sm btn-outline-secondary">تعديل</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="6" class="text-center text-muted py-4">لا توجد إدخالات مطابقة.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page_obj.paginator.num_pages > 1 %}
+    <div class="card-body border-top d-flex justify-content-center">
+      <nav>
+        <ul class="pagination pagination-sm mb-0">
+          {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?{{ querystring }}&page={{ page_obj.previous_page_number }}">السابق</a></li>
+          {% endif %}
+          <li class="page-item disabled"><span class="page-link">صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}</span></li>
+          {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?{{ querystring }}&page={{ page_obj.next_page_number }}">التالي</a></li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

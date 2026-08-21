@@ -5,6 +5,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
+from django.core.paginator import Paginator
 from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
@@ -534,3 +535,123 @@ def daily_report_pdf(request, date=None):
     filename = f"QC_Report_{report_date.strftime('%d-%m-%Y')}.pdf"
     response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response
+
+
+def _format_field_value(field, value):
+    """تنسيق قيمة حقل للعرض في الجداول: اختيارات بالتسمية، أرقام بدون أصفار زائدة."""
+    if value is None or value == "":
+        return "—"
+    if getattr(field, "choices", None):
+        return dict(field.choices).get(value, str(value))
+    if isinstance(value, Decimal):
+        return f"{value:f}".rstrip("0").rstrip(".") if "." in f"{value:f}" else f"{value:f}"
+    return str(value)
+
+
+def entry_tables(entry):
+    """يبني جداول كل بيانات الإدخال تلقائياً من علاقات الموديل،
+    فأي حقل جديد يتضافر لموديل يظهر هنا من غير تعديل القالب."""
+    sections = []
+    for rel in ShiftEntry._meta.related_objects:
+        accessor = rel.get_accessor_name()
+        if rel.one_to_one:
+            obj = getattr(entry, accessor, None)
+            instances = [obj] if obj else []
+        else:
+            instances = list(getattr(entry, accessor).all())
+        if not instances:
+            continue
+        model = rel.related_model
+        fields = [
+            f
+            for f in model._meta.concrete_fields
+            if not f.primary_key and f.name != "shift_entry"
+        ]
+        section = {
+            "title": model._meta.verbose_name_plural
+            or model._meta.verbose_name
+            or model.__name__,
+            "headers": [str(f.verbose_name) for f in fields],
+            "rows": [
+                [_format_field_value(f, getattr(inst, f.name)) for f in fields]
+                for inst in instances
+            ],
+        }
+        if len(instances) == 1:
+            # لجداول الصف الواحد نجهز أزواج (اسم: قيمة) للعرض المدمج
+            row = section["rows"][0]
+            section["pairs"] = [
+                {"label": h, "value": v} for h, v in zip(section["headers"], row)
+            ]
+        sections.append(section)
+    return sections
+
+
+@login_required
+def records_list(request):
+    qs = ShiftEntry.objects.select_related("submitted_by")
+    if not request.user.is_manager:
+        qs = qs.filter(unit=request.user.assigned_unit)
+
+    unit = request.GET.get("unit") or ""
+    date_from = request.GET.get("from") or ""
+    date_to = request.GET.get("to") or ""
+    if unit:
+        qs = qs.filter(unit=unit)
+    try:
+        if date_from:
+            qs = qs.filter(entry_date__gte=date_from)
+        if date_to:
+            qs = qs.filter(entry_date__lte=date_to)
+    except (ValueError, ValidationError):
+        messages.error(request, "صيغة التاريخ غير صحيحة.")
+        date_from = date_to = ""
+
+    qs = qs.order_by("-entry_date", "shift", "-pk")
+    paginator = Paginator(qs, 25)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    params = request.GET.copy()
+    params.pop("page", None)
+    querystring = params.urlencode()
+
+    if request.user.is_manager:
+        available_units = Unit.choices
+    else:
+        available_units = [(request.user.assigned_unit, unit_label(request.user.assigned_unit))]
+
+    return render(
+        request,
+        "records.html",
+        {
+            "page_obj": page_obj,
+            "units": available_units,
+            "sel_unit": unit,
+            "date_from": date_from,
+            "date_to": date_to,
+            "querystring": querystring,
+            "total": paginator.count,
+        },
+    )
+
+
+@login_required
+def record_detail(request, pk):
+    entry = get_object_or_404(
+        ShiftEntry.objects.select_related("submitted_by"), pk=pk
+    )
+    if not (request.user.is_manager or entry.submitted_by == request.user
+            or entry.unit == request.user.assigned_unit):
+        messages.error(request, "لا تملك صلاحية عرض هذا الإدخال.")
+        return redirect("dashboard")
+    can_edit = request.user.is_manager or entry.submitted_by == request.user
+    return render(
+        request,
+        "record_detail.html",
+        {
+            "entry": entry,
+            "unit_label": unit_label(entry.unit),
+            "can_edit": can_edit,
+            "sections": entry_tables(entry),
+        },
+    )

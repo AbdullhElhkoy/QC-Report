@@ -16,4 +16,6 @@ urlpatterns = [
     path("report/<date:date>/", views.daily_report, name="report"),
     path("report/pdf/", views.daily_report_pdf, name="report_pdf_today"),
     path("report/pdf/<date:date>/", views.daily_report_pdf, name="report_pdf"),
+    path("records/", views.records_list, name="records"),
+    path("records/<int:pk>/", views.record_detail, name="record_detail"),
 ]

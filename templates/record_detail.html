@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}تفاصيل الإدخال — QC Report{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h4 mb-0">تفاصيل إدخال — {{ unit_label }}</h1>
+  <div class="no-print d-flex gap-2">
+    <a href="{% url 'records' %}" class="btn btn-outline-secondary btn-sm">رجوع للسجل</a>
+    {% if can_edit %}
+      <a href="{% url 'entry_edit' entry.unit entry.entry_date entry.shift %}"
+         class="btn btn-primary btn-sm">تعديل</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card mb-4 border-secondary">
+  <div class="card-body py-2">
+    <div class="row text-center">
+      <div class="col-6 col-md-3 border-start">
+        <small class="text-muted d-block">الموظف</small>
+        <strong>{{ entry.submitted_by.get_full_name|default:entry.submitted_by.username }}</strong>
+      </div>
+      <div class="col-6 col-md-3 border-start">
+        <small class="text-muted d-block">التاريخ</small>
+        <strong>{{ entry.entry_date|date:"Y-m-d" }}</strong>
+      </div>
+      <div class="col-6 col-md-3 border-start">
+        <small class="text-muted d-block">الوردية</small>
+        <strong>{{ entry.get_shift_display }}</strong>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% for s in sections %}
+  {% if s.pairs %}
+    {# جدول صف واحد: نعرضه كصفوف "اسم : قيمة" بدل جدول عريض #}
+    <div class="card mb-4">
+      <div class="card-header bg-light fw-bold">{{ s.title }}</div>
+      <div class="card-body py-2">
+        <div class="row">
+          {% for p in s.pairs %}
+            <div class="col-6 col-md-3 border-bottom py-2">
+              <small class="text-muted d-block">{{ p.label }}</small>
+              {{ p.value }}
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  {% else %}
+    <div class="card mb-4">
+      <div class="card-header bg-light fw-bold">{{ s.title }}</div>
+      <div class="table-responsive">
+        <table class="table table-bordered table-striped table-sm mb-0 text-center">
+          <thead class="table-light">
+            <tr>{% for h in s.headers %}<th>{{ h }}</th>{% endfor %}</tr>
+          </thead>
+          <tbody>
+            {% for row in s.rows %}
+              <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  {% endif %}
+{% empty %}
+  <div class="alert alert-info">لا توجد بيانات مسجلة في هذا الإدخال.</div>
+{% endfor %}
+{% endblock %}
