@@ -1,0 +1,24 @@
+<div class="row g-3 mb-4">
+  <div class="col-12 col-md-4">
+    <label class="form-label" for="{{ shift_form.entry_date.id_for_label }}">التاريخ</label>
+    {{ shift_form.entry_date }}
+    <small class="text-danger d-block">{{ shift_form.entry_date.errors }}</small>
+  </div>
+  <div class="col-12 col-md-4">
+    <label class="form-label d-block">الوردية</label>
+    {% for radio in shift_form.shift %}
+      <div class="form-check form-check-inline">
+        {{ radio.tag }}{{ radio.choice_label }}
+      </div>
+    {% endfor %}
+    <small class="text-danger d-block">{{ shift_form.shift.errors }}</small>
+  </div>
+  <div class="col-12">
+    <label class="form-label" for="{{ shift_form.general_notes.id_for_label }}">ملاحظات عامة</label>
+    {{ shift_form.general_notes }}
+    <small class="text-danger d-block">{{ shift_form.general_notes.errors }}</small>
+  </div>
+</div>
+{% if shift_form.non_field_errors %}
+  <div class="alert alert-danger">{{ shift_form.non_field_errors }}</div>
+{% endif %}

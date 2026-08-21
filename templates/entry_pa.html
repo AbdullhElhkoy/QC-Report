@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}PA — إدخال بيانات{% endblock %}
+{% block content %}
+<h3 class="mb-1">PA</h3>
+<p class="text-muted">إدخال بيانات الوردية</p>
+
+<form method="post" class="card">
+  <div class="card-body">
+    {% csrf_token %}
+    {% include "partials/shift_fields.html" %}
+
+    <div class="row g-3">
+      {% for field in pa_form %}
+        <div class="col-6 col-md-3">
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          <small class="text-danger d-block">{{ field.errors }}</small>
+        </div>
+      {% endfor %}
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg mt-4">حفظ</button>
+    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary mt-4">إلغاء</a>
+  </div>
+</form>
+{% endblock %}

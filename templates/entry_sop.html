@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}{{ unit_label }} — إدخال بيانات{% endblock %}
+{% block content %}
+<h3 class="mb-1">{{ unit_label }}</h3>
+<p class="text-muted">إدخال بيانات الوردية</p>
+
+{% if entries_today and not editing %}
+  <div class="alert alert-info no-print">
+    ورديات تم إدخالها اليوم:
+    {% for e in entries_today %}
+      <a href="{% url 'entry_edit' unit today e.shift %}" class="alert-link">{{ e.get_shift_display }}</a>
+      {% if not forloop.last %}،{% endif %}
+    {% endfor %}
+  </div>
+{% endif %}
+
+<form method="post" class="card">
+  <div class="card-body">
+    {% csrf_token %}
+    {% include "partials/shift_fields.html" %}
+
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle text-center">
+        <thead class="table-light">
+          <tr>
+            <th>المنتج</th>
+            <th>EXP</th>
+            <th>DOM</th>
+            <th>STD</th>
+            <th>NC</th>
+            <th>سبب العيب</th>
+            <th>ملاحظات</th>
+            <th>رقم العربية</th>
+            <th>وزن العربية</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <th class="table-light">{{ row.label }}</th>
+              <td>{{ row.form.exp }}</td>
+              <td>{{ row.form.dom }}</td>
+              <td>{{ row.form.std }}</td>
+              <td>{{ row.form.nc }}</td>
+              <td>{{ row.form.defect_reason }}</td>
+              <td>{{ row.form.notes }}</td>
+              {% if row.show_car %}
+                <td>{{ row.form.car_number }}</td>
+                <td>{{ row.form.car_weight }}</td>
+              {% else %}
+                <td></td>
+                <td></td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% for row in rows %}
+      {% for field in row.form.hidden_fields %}{% endfor %}
+      {% for field in row.form.visible_fields %}
+        {% if field.errors %}
+          <small class="text-danger d-block">{{ field.label }}: {{ field.errors.0 }}</small>
+        {% endif %}
+      {% endfor %}
+    {% endfor %}
+
+    <button type="submit" class="btn btn-primary btn-lg mt-3">حفظ</button>
+    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary mt-3">إلغاء</a>
+  </div>
+</form>
+{% endblock %}

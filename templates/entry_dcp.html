@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}DCP — إدخال بيانات{% endblock %}
+{% block content %}
+<h3 class="mb-1">DCP</h3>
+<p class="text-muted">إدخال بيانات الوردية</p>
+
+<form method="post" class="card">
+  <div class="card-body">
+    {% csrf_token %}
+    {% include "partials/shift_fields.html" %}
+
+    <h5 class="mt-4 mb-2">ملخص DCP</h5>
+    <div class="row g-3">
+      {% for field in dcp.summary %}
+        <div class="col-6 col-md-3">
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          <small class="text-danger d-block">{{ field.errors }}</small>
+        </div>
+      {% endfor %}
+    </div>
+
+    <h5 class="mt-4 mb-2">تدرج الألوان</h5>
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle text-center">
+        <thead class="table-light">
+          <tr>
+            <th>الفئة</th><th>أخضر</th><th>أصفر</th><th>أخضر وأصفر</th>
+            <th>أزرق</th><th>أبيض</th><th>أحمر</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in dcp.grading_rows %}
+            <tr>
+              <th class="table-light">{{ row.label }}</th>
+              <td>{{ row.form.green }}</td>
+              <td>{{ row.form.yellow }}</td>
+              <td>{{ row.form.green_yellow }}</td>
+              <td>{{ row.form.blue }}</td>
+              <td>{{ row.form.white }}</td>
+              <td>{{ row.form.red }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="row g-3 mt-1">
+      <div class="col-12 col-md-6">
+        <h5 class="mb-2">تحت الاختبار / الأرضية المعمل</h5>
+        <label class="form-label" for="{{ dcp.under_test.quantity.id_for_label }}">الكمية</label>
+        {{ dcp.under_test.quantity }}
+        <small class="text-danger d-block">{{ dcp.under_test.quantity.errors }}</small>
+      </div>
+      <div class="col-12 col-md-6">
+        <h5 class="mb-2">جودة الأبيض (قراءات معمل)</h5>
+        <div class="row g-2">
+          {% for field in dcp.white_quality %}
+            <div class="col-6 col-md-4">
+              <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              <small class="text-danger d-block">{{ field.errors }}</small>
+            </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <h5 class="mt-4 mb-2">التدوير</h5>
+    <div class="row g-3">
+      {% for field in dcp.rework %}
+        <div class="col-6 col-md-3">
+          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+          {{ field }}
+          <small class="text-danger d-block">{{ field.errors }}</small>
+        </div>
+      {% endfor %}
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg mt-4">حفظ</button>
+    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary mt-4">إلغاء</a>
+  </div>
+</form>
+{% endblock %}

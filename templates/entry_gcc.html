@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}{{ unit_label }} — إدخال بيانات{% endblock %}
+{% block content %}
+<h3 class="mb-1">{{ unit_label }}</h3>
+<p class="text-muted">إدخال بيانات الوردية</p>
+
+<form method="post" class="card">
+  <div class="card-body">
+    {% csrf_token %}
+    {% include "partials/shift_fields.html" %}
+
+    <div class="table-responsive">
+      <table class="table table-bordered align-middle text-center">
+        <thead class="table-light">
+          <tr>
+            <th>نوع العبوة</th><th>أخضر</th><th>أصفر</th><th>أبيض</th><th>أزرق</th>
+            <th>NC</th><th>سبب العيب</th><th>ملاحظات</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <th class="table-light">{{ row.label }}</th>
+              <td>{{ row.form.green }}</td>
+              <td>{{ row.form.yellow }}</td>
+              <td>{{ row.form.white }}</td>
+              <td>{{ row.form.blue }}</td>
+              <td>{{ row.form.nc }}</td>
+              <td>{{ row.form.defect_reason }}</td>
+              <td>{{ row.form.notes }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg mt-3">حفظ</button>
+    <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary mt-3">إلغاء</a>
+  </div>
+</form>
+{% endblock %}

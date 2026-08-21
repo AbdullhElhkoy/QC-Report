@@ -1,0 +1,449 @@
+from decimal import Decimal
+
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import ValidationError
+from django.db import IntegrityError, transaction
+from django.http import Http404
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+
+from .aggregations import full_daily_report
+from .forms import (
+    DCPColorGradingForm,
+    DCPReworkForm,
+    DCPSummaryForm,
+    DCPUnderTestForm,
+    DCPWhiteQualityForm,
+    GCCLineItemForm,
+    LoadingLineItemForm,
+    PALineItemForm,
+    SALineItemForm,
+    ShiftEntryForm,
+    SOPLineItemForm,
+)
+from .models import (
+    ColorGradingCategory,
+    DCPColorGrading,
+    DCPRework,
+    DCPSummary,
+    DCPUnderTest,
+    DCPWhiteQuality,
+    GCCLineItem,
+    LoadingLineItem,
+    LoadingProductType,
+    PALineItem,
+    PackageType,
+    ProductType,
+    SALineItem,
+    ShiftEntry,
+    SOPLineItem,
+    SOP_PRODUCT_TYPES,
+    Unit,
+)
+
+ZERO = Decimal("0")
+
+SOP_UNIT_TEMPLATES = {
+    "SOP_A": "entry_sop.html",
+    "SOP_B": "entry_sop.html",
+    "SOP_C": "entry_sop.html",
+    "SOP_D": "entry_sop.html",
+    "G_SOP": "entry_sop.html",
+    "C_PACKING": "entry_sop.html",
+}
+
+
+def unit_label(unit):
+    return dict(ShiftEntry._meta.get_field("unit").choices)[unit]
+
+
+def get_unit_or_404(unit):
+    if unit not in Unit.values:
+        raise Http404
+    return unit
+
+
+def user_can_access_unit(user, unit):
+    return user.is_manager or user.assigned_unit == unit
+
+
+def _first(queryset):
+    return queryset.first()
+
+
+def build_sop_rows(unit, data=None, entry=None):
+    rows = []
+    for pt in SOP_PRODUCT_TYPES[unit]:
+        instance = None
+        if entry is not None:
+            instance = entry.sop_line_items.filter(product_type=pt).first()
+        form = SOPLineItemForm(data, instance=instance, prefix=f"row_{pt}")
+        show_car = pt == ProductType.BULK
+        rows.append({"form": form, "label": ProductType(pt).label, "show_car": show_car})
+    return rows
+
+
+def save_sop_rows(entry, data):
+    for pt in SOP_PRODUCT_TYPES[entry.unit]:
+        form = SOPLineItemForm(data, prefix=f"row_{pt}")
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.shift_entry = entry
+            obj.product_type = pt
+            obj.save()
+
+
+def build_gcc_rows(data=None, entry=None):
+    rows = []
+    for pt in PackageType:
+        instance = None
+        if entry is not None:
+            instance = entry.gcc_line_items.filter(package_type=pt).first()
+        form = GCCLineItemForm(data, instance=instance, prefix=f"row_{pt}")
+        rows.append({"form": form, "label": PackageType(pt).label})
+    return rows
+
+
+def save_gcc_rows(entry, data):
+    for pt in PackageType:
+        form = GCCLineItemForm(data, prefix=f"row_{pt}")
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.shift_entry = entry
+            obj.package_type = pt
+            obj.save()
+
+
+def build_loading_rows(data=None, entry=None):
+    rows = []
+    for pt in LoadingProductType:
+        instance = None
+        if entry is not None:
+            instance = entry.loading_line_items.filter(product_type=pt).first()
+        form = LoadingLineItemForm(data, instance=instance, prefix=f"row_{pt}")
+        rows.append({"form": form, "label": LoadingProductType(pt).label})
+    return rows
+
+
+def save_loading_rows(entry, data):
+    for pt in LoadingProductType:
+        form = LoadingLineItemForm(data, prefix=f"row_{pt}")
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.shift_entry = entry
+            obj.product_type = pt
+            obj.save()
+
+
+def build_dcp_forms(data=None, entry=None):
+    def single(form_class, related_name, prefix):
+        instance = getattr(entry, related_name, None) if entry is not None else None
+        return form_class(data, instance=instance, prefix=prefix)
+
+    grading_rows = []
+    for cat in ColorGradingCategory:
+        instance = None
+        if entry is not None:
+            instance = entry.dcp_color_gradings.filter(category=cat).first()
+        grading_rows.append(
+            {
+                "form": DCPColorGradingForm(data, instance=instance, prefix=f"grade_{cat}"),
+                "label": ColorGradingCategory(cat).label,
+            }
+        )
+    return {
+        "summary": single(DCPSummaryForm, "dcp_summary", "summary"),
+        "grading_rows": grading_rows,
+        "under_test": single(DCPUnderTestForm, "dcp_under_test", "under_test"),
+        "white_quality": single(DCPWhiteQualityForm, "dcp_white_quality", "white_quality"),
+        "rework": single(DCPReworkForm, "dcp_rework", "rework"),
+    }
+
+
+def save_dcp_forms(entry, data):
+    summary = DCPSummaryForm(
+        data, instance=getattr(entry, "dcp_summary", None), prefix="summary"
+    )
+    if summary.is_valid():
+        obj = summary.save(commit=False)
+        obj.shift_entry = entry
+        obj.save()
+    for cat in ColorGradingCategory:
+        existing = entry.dcp_color_gradings.filter(category=cat).first()
+        form = DCPColorGradingForm(data, instance=existing, prefix=f"grade_{cat}")
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.shift_entry = entry
+            obj.category = cat
+            obj.save()
+    under_test = DCPUnderTestForm(
+        data, instance=getattr(entry, "dcp_under_test", None), prefix="under_test"
+    )
+    if under_test.is_valid():
+        obj = under_test.save(commit=False)
+        obj.shift_entry = entry
+        obj.save()
+    white_quality = DCPWhiteQualityForm(
+        data, instance=getattr(entry, "dcp_white_quality", None), prefix="white_quality"
+    )
+    if white_quality.is_valid():
+        obj = white_quality.save(commit=False)
+        obj.shift_entry = entry
+        obj.save()
+    rework = DCPReworkForm(
+        data, instance=getattr(entry, "dcp_rework", None), prefix="rework"
+    )
+    if rework.is_valid():
+        obj = rework.save(commit=False)
+        obj.shift_entry = entry
+        obj.save()
+
+
+def all_row_forms_valid(forms_iterable):
+    return all(f.is_valid() for f in forms_iterable)
+
+
+@login_required
+def dashboard(request):
+    today = timezone.localdate()
+    context = {"today": today}
+    if request.user.is_manager:
+        context["units"] = [
+            {"value": u, "label": label}
+            for u, label in ShiftEntry._meta.get_field("unit").choices
+        ]
+        context["is_manager"] = True
+    else:
+        unit = request.user.assigned_unit
+        context["unit"] = unit
+        context["unit_label"] = unit_label(unit)
+        context["entries_today"] = ShiftEntry.objects.filter(unit=unit, entry_date=today)
+        context["is_manager"] = False
+    return render(request, "dashboard.html", context)
+
+
+def _entry_template(unit):
+    if unit in SOP_UNIT_TEMPLATES:
+        return SOP_UNIT_TEMPLATES[unit]
+    templates = {
+        "DCP": "entry_dcp.html",
+        "PA": "entry_pa.html",
+        "SA": "entry_sa.html",
+        "GCC1": "entry_gcc.html",
+        "GCC2": "entry_gcc.html",
+        "LOADING": "entry_loading.html",
+    }
+    return templates[unit]
+
+
+def _build_all_forms(unit, data=None, entry=None):
+    ctx = {
+        "shift_form": ShiftEntryForm(data, instance=entry),
+        "rows": [],
+        "dcp": None,
+        "pa_form": None,
+        "sa_form": None,
+    }
+    if unit in SOP_UNIT_TEMPLATES:
+        ctx["rows"] = build_sop_rows(unit, data, entry)
+    elif unit in ("GCC1", "GCC2"):
+        ctx["rows"] = build_gcc_rows(data, entry)
+    elif unit == "LOADING":
+        ctx["rows"] = build_loading_rows(data, entry)
+    elif unit == "DCP":
+        ctx["dcp"] = build_dcp_forms(data, entry)
+    elif unit == "PA":
+        instance = _first(entry.pa_line_items.all()) if entry is not None else None
+        ctx["pa_form"] = PALineItemForm(data, instance=instance, prefix="pa")
+    elif unit == "SA":
+        instance = _first(entry.sa_line_items.all()) if entry is not None else None
+        ctx["sa_form"] = SALineItemForm(data, instance=instance, prefix="sa")
+    return ctx
+
+
+def _flatten_forms(ctx):
+    forms = [ctx["shift_form"]]
+    forms.extend(r["form"] for r in ctx["rows"])
+    if ctx["dcp"]:
+        d = ctx["dcp"]
+        forms.append(d["summary"])
+        forms.extend(r["form"] for r in d["grading_rows"])
+        forms.append(d["under_test"])
+        forms.append(d["white_quality"])
+        forms.append(d["rework"])
+    if ctx["pa_form"]:
+        forms.append(ctx["pa_form"])
+    if ctx["sa_form"]:
+        forms.append(ctx["sa_form"])
+    return forms
+
+
+def _save_related(entry, data):
+    unit = entry.unit
+    if unit in SOP_UNIT_TEMPLATES:
+        save_sop_rows(entry, data)
+    elif unit in ("GCC1", "GCC2"):
+        save_gcc_rows(entry, data)
+    elif unit == "LOADING":
+        save_loading_rows(entry, data)
+    elif unit == "DCP":
+        save_dcp_forms(entry, data)
+    elif unit == "PA":
+        form = PALineItemForm(
+            data, instance=entry.pa_line_items.first(), prefix="pa"
+        )
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.shift_entry = entry
+            obj.save()
+    elif unit == "SA":
+        form = SALineItemForm(
+            data, instance=entry.sa_line_items.first(), prefix="sa"
+        )
+        if form.is_valid():
+            obj = form.save(commit=False)
+            obj.shift_entry = entry
+            obj.save()
+
+
+@login_required
+def entry_new(request, unit):
+    get_unit_or_404(unit)
+    if not user_can_access_unit(request.user, unit):
+        messages.error(request, "لا تملك صلاحية إدخال بيانات لهذه الوحدة.")
+        return redirect("dashboard")
+
+    today = timezone.localdate()
+    entries_today = ShiftEntry.objects.filter(unit=unit, entry_date=today)
+
+    if request.method == "POST":
+        ctx = _build_all_forms(unit, data=request.POST)
+        shift_form = ctx["shift_form"]
+        if all_row_forms_valid(_flatten_forms(ctx)):
+            try:
+                with transaction.atomic():
+                    entry = shift_form.save(commit=False)
+                    entry.unit = unit
+                    entry.submitted_by = request.user
+                    entry.full_clean()
+                    entry.save()
+                    _save_related(entry, request.POST)
+                return redirect("entry_done", unit=unit, pk=entry.pk)
+            except (IntegrityError, ValidationError):
+                shift_form.add_error(
+                    None,
+                    "تم إدخال هذه الوردية بالفعل لهذا اليوم والوحدة. اختر وردية أخرى أو عدّل الإدخال الموجود.",
+                )
+                messages.warning(request, "هذا الإدخال موجود بالفعل.")
+    else:
+        ctx = _build_all_forms(unit)
+
+    existing_shifts = {e.shift: e for e in entries_today}
+    return render(
+        request,
+        _entry_template(unit),
+        {
+            "unit": unit,
+            "unit_label": unit_label(unit),
+            "today": today,
+            "entries_today": entries_today,
+            "existing_shifts": existing_shifts,
+            **ctx,
+        },
+    )
+
+
+@login_required
+def entry_edit(request, unit, entry_date, shift):
+    get_unit_or_404(unit)
+    entry = get_object_or_404(
+        ShiftEntry, unit=unit, entry_date=entry_date, shift=shift
+    )
+    if not (request.user.is_manager or entry.submitted_by == request.user):
+        messages.error(request, "لا تملك صلاحية تعديل هذا الإدخال.")
+        return redirect("dashboard")
+
+    if request.method == "POST":
+        ctx = _build_all_forms(unit, data=request.POST, entry=entry)
+        if all_row_forms_valid(_flatten_forms(ctx)):
+            try:
+                with transaction.atomic():
+                    ctx["shift_form"].save()
+                    _save_related(entry, request.POST)
+                messages.success(request, "تم تعديل الإدخال بنجاح.")
+                return redirect("entry_done", unit=unit, pk=entry.pk)
+            except (IntegrityError, ValidationError):
+                ctx["shift_form"].add_error(
+                    None,
+                    "يوجد إدخال آخر لنفس الوحدة والتاريخ والوردية.",
+                )
+    else:
+        ctx = _build_all_forms(unit, entry=entry)
+
+    return render(
+        request,
+        _entry_template(unit),
+        {
+            "unit": unit,
+            "unit_label": unit_label(unit),
+            "editing": True,
+            "entry": entry,
+            "today": timezone.localdate(),
+            **ctx,
+        },
+    )
+
+
+def entry_summary_context(entry):
+    ctx = {}
+    unit = entry.unit
+    if unit in SOP_UNIT_TEMPLATES:
+        items = entry.sop_line_items.all()
+        ctx["sop_items"] = items
+        ctx["sop_total"] = sum((i.total for i in items), ZERO)
+    elif unit == "DCP":
+        ctx["dcp_summary"] = getattr(entry, "dcp_summary", None)
+        ctx["gradings"] = entry.dcp_color_gradings.all()
+        ctx["under_test"] = getattr(entry, "dcp_under_test", None)
+        ctx["white_quality"] = getattr(entry, "dcp_white_quality", None)
+        ctx["rework"] = getattr(entry, "dcp_rework", None)
+    elif unit == "PA":
+        ctx["pa_items"] = entry.pa_line_items.all()
+    elif unit == "SA":
+        ctx["sa_items"] = entry.sa_line_items.all()
+    elif unit in ("GCC1", "GCC2"):
+        ctx["gcc_items"] = entry.gcc_line_items.all()
+    elif unit == "LOADING":
+        ctx["loading_items"] = entry.loading_line_items.all()
+    return ctx
+
+
+@login_required
+def entry_done(request, unit, pk):
+    get_unit_or_404(unit)
+    entry = get_object_or_404(ShiftEntry, pk=pk, unit=unit)
+    can_edit = request.user.is_manager or entry.submitted_by == request.user
+    return render(
+        request,
+        "confirm.html",
+        {
+            "entry": entry,
+            "unit_label": unit_label(unit),
+            "can_edit": can_edit,
+            **entry_summary_context(entry),
+        },
+    )
+
+
+@login_required
+def daily_report(request, date=None):
+    if not request.user.is_manager:
+        messages.error(request, "التقرير اليومي متاح للمدير فقط.")
+        return redirect("dashboard")
+    report_date = date or timezone.localdate()
+    context = full_daily_report(report_date)
+    context["prev_date"] = report_date - timezone.timedelta(days=1)
+    context["next_date"] = report_date + timezone.timedelta(days=1)
+    context["today"] = timezone.localdate()
+    return render(request, "report.html", context)

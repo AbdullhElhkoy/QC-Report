@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% block title %}التقرير اليومي — {{ date }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 no-print">
+  <h3 class="mb-0">التقرير اليومي — {{ date }}</h3>
+  <div>
+    <a href="{% url 'report' prev_date %}" class="btn btn-outline-secondary btn-sm">اليوم السابق</a>
+    <form method="get" action="" class="d-inline">
+      <input type="date" id="reportDate" value="{{ date|date:'Y-m-d' }}" class="form-control form-control-sm d-inline-block w-auto">
+      <button type="button" class="btn btn-outline-primary btn-sm"
+              onclick="location.href='/report/' + document.getElementById('reportDate').value + '/'">عرض</button>
+    </form>
+    <a href="{% url 'report' next_date %}" class="btn btn-outline-secondary btn-sm">اليوم التالي</a>
+    <button type="button" class="btn btn-dark btn-sm" onclick="window.print()">طباعة / PDF</button>
+  </div>
+</div>
+
+<h5>SOP Units</h5>
+<div class="table-responsive mb-2">
+  <table class="table table-bordered text-center align-middle bg-white">
+    <thead class="table-light">
+      <tr><th>الوحدة</th><th>المنتج</th><th>EXP</th><th>DOM</th><th>STD</th><th>NC</th><th>الإجمالي</th></tr>
+    </thead>
+    <tbody>
+      {% for unit_row in sop.rows %}
+        {% for p in unit_row.products %}
+          <tr>
+            {% if forloop.first %}<td rowspan="{{ unit_row.products|length }}">{{ unit_row.label }}</td>{% endif %}
+            <td>{{ p.product_type }}</td>
+            <td>{{ p.exp }}</td><td>{{ p.dom }}</td><td>{{ p.std }}</td><td>{{ p.nc }}</td>
+            <td>{{ p.total }}</td>
+          </tr>
+        {% endfor %}
+        <tr class="table-secondary fw-bold">
+          <td colspan="6">إجمالي {{ unit_row.label }}</td>
+          <td>{{ unit_row.total }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<div class="row mb-4">
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-header">SOP UNIT %</div>
+      <div class="card-body">
+        <div class="row text-center">
+          <div class="col-3"><strong>NC%</strong><br>{{ sop.percentages.nc|floatformat:2 }}</div>
+          <div class="col-3"><strong>STD%</strong><br>{{ sop.percentages.std|floatformat:2 }}</div>
+          <div class="col-3"><strong>DOM%</strong><br>{{ sop.percentages.dom|floatformat:2 }}</div>
+          <div class="col-3"><strong>EXP%</strong><br>{{ sop.percentages.exp|floatformat:2 }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-header">Car (BULK)</div>
+      <div class="card-body p-0">
+        <table class="table table-bordered text-center mb-0">
+          <thead class="table-light">
+            <tr><th></th><th>EXP</th><th>DOM</th><th>STD</th><th>Total</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th>عدد العربيات</th>
+              <td>{{ sop.car_summary.car_number_exp }}</td>
+              <td>{{ sop.car_summary.car_number_dom }}</td>
+              <td>{{ sop.car_summary.car_number_std }}</td>
+              <td>{{ sop.car_summary.car_number_total }}</td>
+            </tr>
+            <tr>
+              <th>الوزن</th>
+              <td>{{ sop.car_summary.weight_exp }}</td>
+              <td>{{ sop.car_summary.weight_dom }}</td>
+              <td>{{ sop.car_summary.weight_std }}</td>
+              <td>{{ sop.car_summary.weight_total }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h5>DCP</h5>
+<div class="table-responsive mb-4">
+  <table class="table table-bordered text-center align-middle bg-white">
+    <tbody>
+      <tr>
+        <th class="table-light">B.B</th><td>{{ dcp.summary.bb_total }}</td>
+        <th class="table-light">AS S.B</th><td>{{ dcp.summary.as_sb_total }}</td>
+        <th class="table-light">TOTAL (1)</th><td>{{ dcp.summary.total_1 }}</td>
+        <th class="table-light">TOTAL (2)</th><td>{{ dcp.summary.total_2 }}</td>
+      </tr>
+      <tr>
+        <th class="table-light">اختبار معمل</th><td>{{ dcp.summary.lab_test_count }}</td>
+        <th class="table-light">اختبار امس</th><td>{{ dcp.summary.yesterday_test_count }}</td>
+        <th class="table-light">تحت الاختبار</th><td>{{ dcp.under_test }}</td>
+        <th class="table-light"></th><td></td>
+      </tr>
+    </tbody>
+  </table>
+  <table class="table table-bordered text-center align-middle bg-white">
+    <thead class="table-light">
+      <tr><th>الفئة</th><th>أخضر</th><th>أصفر</th><th>أخضر وأصفر</th><th>أزرق</th><th>أبيض</th><th>أحمر</th><th>الإجمالي</th></tr>
+    </thead>
+    <tbody>
+      {% for c in dcp.categories %}
+        <tr>
+          <th class="table-light">{{ c.category }}</th>
+          <td>{{ c.green }}</td><td>{{ c.yellow }}</td><td>{{ c.green_yellow }}</td>
+          <td>{{ c.blue }}</td><td>{{ c.white }}</td><td>{{ c.red }}</td>
+          <td>{{ c.total }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <table class="table table-bordered text-center align-middle bg-white">
+    <tbody>
+      <tr>
+        <th class="table-light">IM</th><td>{{ dcp.white_quality.im }}</td>
+        <th class="table-light">Over</th><td>{{ dcp.white_quality.over }}</td>
+        <th class="table-light">Color</th><td>{{ dcp.white_quality.color }}</td>
+        <th class="table-light">P2O5</th><td>{{ dcp.white_quality.p2o5 }}</td>
+        <th class="table-light">MC</th><td>{{ dcp.white_quality.mc }}</td>
+        <th class="table-light">NC</th><td>{{ dcp.white_quality.nc_count }}</td>
+      </tr>
+      <tr>
+        <th class="table-light">التدوير اجمالي</th><td>{{ dcp.rework.total }}</td>
+        <th class="table-light">اخضر واصفر</th><td>{{ dcp.rework.green_yellow }}</td>
+        <th class="table-light">اصفر</th><td>{{ dcp.rework.yellow }}</td>
+        <th class="table-light">اخضر</th><td>{{ dcp.rework.green }}</td>
+      </tr>
+    </tbody>
+  </table>
+  {% if dcp.notes %}
+    <p class="text-muted">{% for n in dcp.notes %}{{ n }}{% if not forloop.last %} — {% endif %}{% endfor %}</p>
+  {% endif %}
+</div>
+
+<h5>PA / SA</h5>
+<div class="table-responsive mb-4">
+  <table class="table table-bordered text-center align-middle bg-white">
+    <tbody>
+      <tr>
+        <th class="table-light">PA JC 43</th><td>{{ pa.jc_43 }}</td>
+        <th class="table-light">PA JC 62</th><td>{{ pa.jc_62 }}</td>
+        <th class="table-light">PA Cube 43</th><td>{{ pa.cube_43 }}</td>
+        <th class="table-light">PA Cube 61</th><td>{{ pa.cube_61 }}</td>
+        <th class="table-light">PA الإجمالي</th><td>{{ pa.total }}</td>
+      </tr>
+      <tr>
+        <th class="table-light">SA JC</th><td>{{ sa.jc }}</td>
+        <th class="table-light"></th><td></td>
+        <th class="table-light"></th><td></td>
+        <th class="table-light"></th><td></td>
+        <th class="table-light"></th><td></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<h5>GCC</h5>
+<div class="table-responsive mb-4">
+  <table class="table table-bordered text-center align-middle bg-white">
+    <thead class="table-light">
+      <tr><th>الوحدة</th><th>نوع العبوة</th><th>أخضر</th><th>أصفر</th><th>أبيض</th><th>أزرق</th><th>NC</th><th>الإجمالي</th></tr>
+    </thead>
+    <tbody>
+      {% for g in gcc %}
+        {% for p in g.packages %}
+          <tr>
+            {% if forloop.first %}<td rowspan="{{ g.packages|length }}">{{ g.unit }}</td>{% endif %}
+            <td>{{ p.package_type }}</td>
+            <td>{{ p.green }}</td><td>{{ p.yellow }}</td><td>{{ p.white }}</td><td>{{ p.blue }}</td>
+            <td>{{ p.nc }}</td><td>{{ p.total }}</td>
+          </tr>
+        {% endfor %}
+        <tr class="table-secondary fw-bold">
+          <td colspan="7">إجمالي {{ g.unit }}</td>
+          <td>{{ g.grand_total }}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h5>Loading</h5>
+<div class="table-responsive mb-4">
+  <table class="table table-bordered text-center align-middle bg-white">
+    <thead class="table-light">
+      <tr><th>نوع المنتج</th><th>EXP</th><th>DOM</th><th>الإجمالي</th></tr>
+    </thead>
+    <tbody>
+      {% for r in loading.rows %}
+        <tr>
+          <th class="table-light">{{ r.product_type }}</th>
+          <td>{{ r.exp }}</td><td>{{ r.dom }}</td><td>{{ r.total }}</td>
+        </tr>
+      {% endfor %}
+      <tr class="table-secondary fw-bold">
+        <td colspan="3">الإجمالي العام</td>
+        <td>{{ loading.grand_total }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<h5 class="no-print">الرسوم البيانية</h5>
+<div class="row g-4 mb-4 no-print">
+  <div class="col-12 col-lg-6"><div class="card"><div class="card-body"><canvas id="chartTotalQty"></canvas></div></div></div>
+  <div class="col-12 col-lg-6"><div class="card"><div class="card-body"><canvas id="chartDcp"></canvas></div></div></div>
+  <div class="col-12 col-lg-6"><div class="card"><div class="card-body"><canvas id="chartGcc"></canvas></div></div></div>
+  <div class="col-12 col-lg-6"><div class="card"><div class="card-body"><canvas id="chartLoading"></canvas></div></div></div>
+</div>
+
+{{ charts|json_script:"charts-data" }}
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script>
+  const data = JSON.parse(document.getElementById("charts-data").textContent);
+
+  function barChart(id, labels, values, label) {
+    new Chart(document.getElementById(id), {
+      type: "bar",
+      data: {
+        labels: labels,
+        datasets: [{ label: label, data: values, backgroundColor: "rgba(13,110,253,.6)" }]
+      },
+      options: {
+        responsive: true,
+        plugins: { title: { display: true, text: label } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+
+  barChart("chartTotalQty", data.total_qty.labels, data.total_qty.values, "Total QTY for All Product");
+  barChart("chartDcp", data.dcp.labels, data.dcp.values, "DCP");
+  barChart("chartGcc", data.gcc.labels, data.gcc.values, "GCC1 vs GCC2");
+  barChart("chartLoading", data.loading.labels, data.loading.values, "Loading");
+</script>
+{% endblock %}

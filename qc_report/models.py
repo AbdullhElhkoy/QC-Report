@@ -1,0 +1,295 @@
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+
+
+class Unit(models.TextChoices):
+    SOP_A = "SOP_A", "SOP A"
+    SOP_B = "SOP_B", "SOP B"
+    SOP_C = "SOP_C", "SOP C"
+    SOP_D = "SOP_D", "SOP D"
+    G_SOP = "G_SOP", "G SOP"
+    C_PACKING = "C_PACKING", "C.Packing"
+    DCP = "DCP", "DCP"
+    PA = "PA", "PA"
+    SA = "SA", "SA"
+    GCC1 = "GCC1", "GCC1"
+    GCC2 = "GCC2", "GCC2"
+    LOADING = "LOADING", "Loading"
+
+
+class Shift(models.TextChoices):
+    SHIFT_1 = "SHIFT_1", "الوردية الأولى"
+    SHIFT_2 = "SHIFT_2", "الوردية الثانية"
+    SHIFT_3 = "SHIFT_3", "الوردية الثالثة"
+
+
+class ProductType(models.TextChoices):
+    S_B = "S_B", "S.B"
+    B_B = "B_B", "B.B"
+    BULK = "BULK", "BULK"
+    O_M = "O_M", "O.M"
+    VA = "VA", "VA"
+
+
+class PackageType(models.TextChoices):
+    B_B = "B_B", "B.B"
+    S_B = "S_B", "S.B"
+
+
+class LoadingProductType(models.TextChoices):
+    SOP = "SOP", "SOP"
+    GSOP = "GSOP", "GSOP"
+    GCC = "GCC", "GCC"
+    DCP = "DCP", "DCP"
+    PA = "PA", "PA"
+    SA = "SA", "SA"
+    HCL = "HCL", "HCL"
+
+
+class ColorGradingCategory(models.TextChoices):
+    TOTAL = "TOTAL", "الإجمالي"
+    EX_SB = "EX_SB", "EX S.B"
+    DOM_SB = "DOM_SB", "DOM S.B"
+    SB_WHITE = "SB_WHITE", "S.B White"
+
+
+SOP_PRODUCT_TYPES = {
+    Unit.SOP_A: [ProductType.S_B, ProductType.B_B, ProductType.BULK],
+    Unit.SOP_B: [ProductType.S_B, ProductType.B_B, ProductType.BULK],
+    Unit.SOP_C: [ProductType.S_B, ProductType.B_B, ProductType.BULK],
+    Unit.SOP_D: [ProductType.S_B, ProductType.B_B, ProductType.BULK],
+    Unit.G_SOP: [ProductType.S_B, ProductType.B_B],
+    Unit.C_PACKING: [ProductType.O_M, ProductType.VA, ProductType.B_B],
+}
+
+SOP_UNITS = [
+    Unit.SOP_A,
+    Unit.SOP_B,
+    Unit.SOP_C,
+    Unit.SOP_D,
+    Unit.G_SOP,
+    Unit.C_PACKING,
+]
+
+
+class User(AbstractUser):
+    assigned_unit = models.CharField(
+        "الوحدة المسند إليها",
+        max_length=20,
+        choices=Unit.choices,
+        null=True,
+        blank=True,
+    )
+
+    @property
+    def is_manager(self):
+        return self.is_staff or self.is_superuser or self.assigned_unit is None
+
+
+class ShiftEntry(models.Model):
+    unit = models.CharField("الوحدة", max_length=20, choices=Unit.choices)
+    entry_date = models.DateField("التاريخ")
+    shift = models.CharField("الوردية", max_length=10, choices=Shift.choices)
+    submitted_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="أدخلها",
+        on_delete=models.CASCADE,
+        related_name="shift_entries",
+    )
+    submitted_at = models.DateTimeField("وقت الإدخال", auto_now_add=True)
+    general_notes = models.TextField("ملاحظات عامة", blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["unit", "entry_date", "shift"],
+                name="unique_shift_per_unit_per_day",
+            )
+        ]
+        ordering = ["entry_date", "unit", "shift"]
+
+    def __str__(self):
+        return f"{self.get_unit_display()} - {self.entry_date} - {self.get_shift_display()}"
+
+
+class SOPLineItem(models.Model):
+    shift_entry = models.ForeignKey(
+        ShiftEntry, on_delete=models.CASCADE, related_name="sop_line_items"
+    )
+    product_type = models.CharField("نوع المنتج", max_length=10, choices=ProductType.choices)
+    exp = models.DecimalField("EXP", max_digits=10, decimal_places=2, default=0)
+    dom = models.DecimalField("DOM", max_digits=10, decimal_places=2, default=0)
+    std = models.DecimalField("STD", max_digits=10, decimal_places=2, default=0)
+    nc = models.DecimalField("NC", max_digits=10, decimal_places=2, default=0)
+    defect_reason = models.CharField("سبب العيب", max_length=100, blank=True)
+    notes = models.TextField("ملاحظات", blank=True)
+    car_number = models.PositiveIntegerField("رقم العربية", null=True, blank=True)
+    car_weight = models.DecimalField(
+        "وزن العربية", max_digits=10, decimal_places=2, null=True, blank=True
+    )
+
+    class Meta:
+        ordering = ["product_type"]
+
+    @property
+    def total(self):
+        return self.exp + self.dom + self.std
+
+    def __str__(self):
+        return f"{self.shift_entry} - {self.get_product_type_display()}"
+
+
+class DCPSummary(models.Model):
+    shift_entry = models.OneToOneField(
+        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_summary"
+    )
+    bb_total = models.DecimalField("B.B", max_digits=10, decimal_places=2, default=0)
+    as_sb_total = models.DecimalField("AS S.B", max_digits=10, decimal_places=2, default=0)
+    total_1 = models.DecimalField("TOTAL (1)", max_digits=10, decimal_places=2, default=0)
+    total_2 = models.DecimalField("TOTAL (2)", max_digits=10, decimal_places=2, default=0)
+    lab_test_count = models.PositiveIntegerField("اختبار معمل", default=0)
+    yesterday_test_count = models.PositiveIntegerField("اختبار امس", default=0)
+    unlabeled_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+
+    def __str__(self):
+        return f"DCP Summary - {self.shift_entry}"
+
+
+class DCPColorGrading(models.Model):
+    shift_entry = models.ForeignKey(
+        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_color_gradings"
+    )
+    category = models.CharField("الفئة", max_length=10, choices=ColorGradingCategory.choices)
+    green = models.PositiveIntegerField("أخضر", default=0)
+    yellow = models.PositiveIntegerField("أصفر", default=0)
+    green_yellow = models.PositiveIntegerField("أخضر وأصفر", default=0)
+    blue = models.PositiveIntegerField("أزرق", default=0)
+    white = models.PositiveIntegerField("أبيض", default=0)
+    red = models.PositiveIntegerField("أحمر", default=0)
+
+    class Meta:
+        ordering = ["category"]
+
+    @property
+    def total(self):
+        return self.green + self.yellow + self.green_yellow + self.blue + self.white + self.red
+
+    def __str__(self):
+        return f"{self.shift_entry} - {self.get_category_display()}"
+
+
+class DCPUnderTest(models.Model):
+    shift_entry = models.OneToOneField(
+        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_under_test"
+    )
+    quantity = models.DecimalField("الكمية", max_digits=10, decimal_places=2, default=0)
+
+    def __str__(self):
+        return f"Under Test - {self.shift_entry}"
+
+
+class DCPWhiteQuality(models.Model):
+    shift_entry = models.OneToOneField(
+        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_white_quality"
+    )
+    im = models.DecimalField("IM", max_digits=10, decimal_places=2, default=0)
+    over = models.DecimalField("Over", max_digits=10, decimal_places=2, default=0)
+    color = models.DecimalField("Color", max_digits=10, decimal_places=2, default=0)
+    p2o5 = models.DecimalField("P2O5", max_digits=10, decimal_places=2, default=0)
+    mc = models.DecimalField("MC", max_digits=10, decimal_places=2, default=0)
+    nc_count = models.PositiveIntegerField("عدد NC", default=0)
+
+    def __str__(self):
+        return f"White Quality - {self.shift_entry}"
+
+
+class DCPRework(models.Model):
+    shift_entry = models.OneToOneField(
+        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_rework"
+    )
+    total = models.DecimalField("اجمالي", max_digits=10, decimal_places=2, default=0)
+    green_yellow = models.DecimalField("اخضر واصفر", max_digits=10, decimal_places=2, default=0)
+    yellow = models.DecimalField("اصفر", max_digits=10, decimal_places=2, default=0)
+    green = models.DecimalField("اخضر", max_digits=10, decimal_places=2, default=0)
+
+    def __str__(self):
+        return f"Rework - {self.shift_entry}"
+
+
+class PALineItem(models.Model):
+    shift_entry = models.ForeignKey(
+        ShiftEntry, on_delete=models.CASCADE, related_name="pa_line_items"
+    )
+    jc_43 = models.DecimalField("JC 43", max_digits=10, decimal_places=2, default=0)
+    jc_62 = models.DecimalField("JC 62", max_digits=10, decimal_places=2, default=0)
+    cube_43 = models.DecimalField("Cube 43", max_digits=10, decimal_places=2, default=0)
+    cube_61 = models.DecimalField("Cube 61", max_digits=10, decimal_places=2, default=0)
+
+    class Meta:
+        ordering = ["id"]
+
+    @property
+    def total(self):
+        return self.jc_43 + self.jc_62 + self.cube_43 + self.cube_61
+
+    def __str__(self):
+        return f"PA - {self.shift_entry}"
+
+
+class SALineItem(models.Model):
+    shift_entry = models.ForeignKey(
+        ShiftEntry, on_delete=models.CASCADE, related_name="sa_line_items"
+    )
+    jc = models.DecimalField("JC", max_digits=10, decimal_places=2, default=0)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"SA - {self.shift_entry}"
+
+
+class GCCLineItem(models.Model):
+    shift_entry = models.ForeignKey(
+        ShiftEntry, on_delete=models.CASCADE, related_name="gcc_line_items"
+    )
+    package_type = models.CharField("نوع العبوة", max_length=10, choices=PackageType.choices)
+    green = models.PositiveIntegerField("أخضر", default=0)
+    yellow = models.PositiveIntegerField("أصفر", default=0)
+    white = models.PositiveIntegerField("أبيض", default=0)
+    blue = models.PositiveIntegerField("أزرق", default=0)
+    nc = models.DecimalField("NC", max_digits=10, decimal_places=2, default=0)
+    defect_reason = models.CharField("سبب العيب", max_length=100, blank=True)
+    notes = models.TextField("ملاحظات", blank=True)
+
+    class Meta:
+        ordering = ["package_type"]
+
+    @property
+    def total(self):
+        return self.green + self.yellow + self.white + self.blue
+
+    def __str__(self):
+        return f"{self.shift_entry} - {self.get_package_type_display()}"
+
+
+class LoadingLineItem(models.Model):
+    shift_entry = models.ForeignKey(
+        ShiftEntry, on_delete=models.CASCADE, related_name="loading_line_items"
+    )
+    product_type = models.CharField(
+        "نوع المنتج", max_length=10, choices=LoadingProductType.choices
+    )
+    exp = models.DecimalField("EXP", max_digits=10, decimal_places=2, default=0)
+    dom = models.DecimalField("DOM", max_digits=10, decimal_places=2, default=0)
+
+    class Meta:
+        ordering = ["product_type"]
+
+    @property
+    def total(self):
+        return self.exp + self.dom
+
+    def __str__(self):
+        return f"{self.shift_entry} - {self.get_product_type_display()}"

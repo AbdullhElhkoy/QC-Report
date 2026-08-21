@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}الرئيسية — QC Report{% endblock %}
+{% block content %}
+<h3 class="mb-4">مرحباً، {{ user.username }}</h3>
+
+{% if is_manager %}
+  <div class="card mb-4">
+    <div class="card-header">التقرير اليومي</div>
+    <div class="card-body">
+      <p>عرض التقرير المجمع لكل الوحدات مع الرسوم البيانية.</p>
+      <a href="{% url 'report_today' %}" class="btn btn-success">تقرير اليوم ({{ today }})</a>
+      <a href="/admin/" class="btn btn-outline-secondary">إدارة المستخدمين والإدخالات</a>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-header">إدخال بيانات وحدة معينة</div>
+    <div class="card-body">
+      <div class="row g-2">
+        {% for u in units %}
+          <div class="col-6 col-md-4 col-lg-3">
+            <a href="{% url 'entry_new' u.value %}" class="btn btn-outline-primary w-100">{{ u.label }}</a>
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+{% else %}
+  <div class="card mb-4">
+    <div class="card-header">وحدتك: {{ unit_label }}</div>
+    <div class="card-body">
+      <a href="{% url 'entry_new' unit %}" class="btn btn-primary btn-lg">إدخال بيانات وردية جديدة</a>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">إدخالات اليوم ({{ today }})</div>
+    <div class="card-body">
+      {% if entries_today %}
+        <table class="table table-striped align-middle">
+          <thead>
+            <tr><th>الوردية</th><th>وقت الإدخال</th><th></th></tr>
+          </thead>
+          <tbody>
+            {% for e in entries_today %}
+              <tr>
+                <td>{{ e.get_shift_display }}</td>
+                <td>{{ e.submitted_at|time:"H:i" }}</td>
+                <td>
+                  <a href="{% url 'entry_done' unit e.pk %}" class="btn btn-sm btn-outline-secondary">عرض</a>
+                  <a href="{% url 'entry_edit' unit today e.shift %}" class="btn btn-sm btn-outline-primary">تعديل</a>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="text-muted mb-0">لم يتم إدخال أي وردية اليوم بعد.</p>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
