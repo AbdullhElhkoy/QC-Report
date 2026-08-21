@@ -29,6 +29,13 @@
       <a href="{% url 'records' %}" class="btn btn-outline-secondary flex-fill">مسح</a>
     </div>
   </div>
+  {% if total %}
+  <div class="mt-3">
+    <a href="{% url 'records_export' %}?{{ querystring }}" class="btn btn-success btn-sm">
+      تصدير Excel (حسب الفلتر الحالي)
+    </a>
+  </div>
+  {% endif %}
 </form>
 
 <div class="card">

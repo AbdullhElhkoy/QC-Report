@@ -1,4 +1,5 @@
 from decimal import Decimal
+from io import BytesIO
 
 from django.conf import settings
 from django.contrib import messages
@@ -48,6 +49,20 @@ from .models import (
 )
 
 ZERO = Decimal("0")
+
+# أسماء عربية لجداول بيانات كل وحدة (تظهر في صفحة التفاصيل وأوراق Excel)
+MODEL_TITLES = {
+    "SOPLineItem": "بنود SOP",
+    "DCPSummary": "ملخص DCP",
+    "DCPColorGrading": "تصنيف الألوان",
+    "DCPUnderTest": "العينات تحت الاختبار",
+    "DCPWhiteQuality": "جودة الأبيض",
+    "DCPRework": "التدوير",
+    "PALineItem": "بنود PA",
+    "SALineItem": "بنود SA",
+    "GCCLineItem": "بنود GCC",
+    "LoadingLineItem": "بنود التحميل",
+}
 
 # تسلسل الورديات المتكرر خلال اليوم: أول إدخال = الأولى، تاني = الثانية، تالت = الثالثة
 SHIFT_SEQUENCE = [Shift.SHIFT_1, Shift.SHIFT_2, Shift.SHIFT_3]
@@ -568,9 +583,12 @@ def entry_tables(entry):
             if not f.primary_key and f.name != "shift_entry"
         ]
         section = {
-            "title": model._meta.verbose_name_plural
-            or model._meta.verbose_name
-            or model.__name__,
+            "title": MODEL_TITLES.get(
+                model.__name__,
+                model._meta.verbose_name_plural
+                or model._meta.verbose_name
+                or model.__name__,
+            ),
             "headers": [str(f.verbose_name) for f in fields],
             "rows": [
                 [_format_field_value(f, getattr(inst, f.name)) for f in fields]
@@ -587,12 +605,11 @@ def entry_tables(entry):
     return sections
 
 
-@login_required
-def records_list(request):
+def _filtered_entries(request):
+    """الإدخالات بعد تطبيق صلاحيات المستخدم وفلاتر الوحدة/الفترة."""
     qs = ShiftEntry.objects.select_related("submitted_by")
     if not request.user.is_manager:
         qs = qs.filter(unit=request.user.assigned_unit)
-
     unit = request.GET.get("unit") or ""
     date_from = request.GET.get("from") or ""
     date_to = request.GET.get("to") or ""
@@ -604,10 +621,14 @@ def records_list(request):
         if date_to:
             qs = qs.filter(entry_date__lte=date_to)
     except (ValueError, ValidationError):
-        messages.error(request, "صيغة التاريخ غير صحيحة.")
         date_from = date_to = ""
+    return qs.order_by("-entry_date", "shift", "-pk"), date_from, date_to
 
-    qs = qs.order_by("-entry_date", "shift", "-pk")
+
+@login_required
+def records_list(request):
+    qs, date_from, date_to = _filtered_entries(request)
+
     paginator = Paginator(qs, 25)
     page_obj = paginator.get_page(request.GET.get("page"))
 
@@ -626,7 +647,7 @@ def records_list(request):
         {
             "page_obj": page_obj,
             "units": available_units,
-            "sel_unit": unit,
+            "sel_unit": request.GET.get("unit") or "",
             "date_from": date_from,
             "date_to": date_to,
             "querystring": querystring,
@@ -655,3 +676,128 @@ def record_detail(request, pk):
             "sections": entry_tables(entry),
         },
     )
+
+
+def _excel_cell(field, value):
+    """قيمة حقل كقيمة إكسيل أصلية (تاريخ/رقم) بدل نص."""
+    if value is None or value == "":
+        return ""
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, bool):
+        return "نعم" if value else "لا"
+    if hasattr(value, "strftime"):
+        return value.strftime("%Y-%m-%d %H:%M") if value.hour or value.minute else value.strftime("%Y-%m-%d")
+    if getattr(field, "choices", None):
+        return dict(field.choices).get(value, str(value))
+    return value
+
+
+def _style_sheet(ws, ncols, freeze=True):
+    from openpyxl.styles import Alignment, Font, PatternFill
+
+    fill = PatternFill("solid", fgColor="4472C4")
+    font = Font(bold=True, color="FFFFFF")
+    for c in range(1, ncols + 1):
+        cell = ws.cell(row=1, column=c)
+        cell.fill = fill
+        cell.font = font
+        cell.alignment = Alignment(horizontal="center")
+    if freeze:
+        ws.freeze_panes = "A2"
+    # عرض أعمدة معقول بناء على أطول قيمة في أول 200 صف
+    for c in range(1, ncols + 1):
+        width = 12
+        for r in range(1, min(ws.max_row, 200) + 1):
+            v = ws.cell(row=r, column=c).value
+            if v is not None:
+                width = max(width, min(len(str(v)) + 4, 40))
+        ws.column_dimensions[ws.cell(row=1, column=c).column_letter].width = width
+
+
+@login_required
+def records_export(request):
+    from openpyxl import Workbook
+
+    qs, date_from, date_to = _filtered_entries(request)
+
+    wb = Workbook()
+
+    # ورقة السجل العام: صف لكل إدخال وردية
+    main = wb.active
+    main.title = "السجل"
+    main.sheet_view.rightToLeft = True
+    main.append(["التاريخ", "الوردية", "الوحدة", "الموظف", "ملاحظات"])
+    for e in qs:
+        main.append(
+            [
+                e.entry_date,
+                e.get_shift_display(),
+                e.get_unit_display(),
+                e.submitted_by.get_full_name() or e.submitted_by.username,
+                e.general_notes or "",
+            ]
+        )
+        main.cell(row=main.max_row, column=1).number_format = "yyyy-mm-dd"
+    _style_sheet(main, 5)
+
+    # ورقة لكل (وحدة × جدول بيانات) فيها بيانات داخل الفترة
+    unit_codes = [u for u, _ in Unit.choices]
+    units_present = set(qs.values_list("unit", flat=True))
+    for code in unit_codes:
+        if code not in units_present:
+            continue
+        for rel in ShiftEntry._meta.related_objects:
+            model = rel.related_model
+            rows_qs = (
+                model.objects.filter(shift_entry__in=qs, shift_entry__unit=code)
+                .select_related("shift_entry")
+                .order_by("-shift_entry__entry_date", "-shift_entry__pk")
+            )
+            fields = [
+                f
+                for f in model._meta.concrete_fields
+                if not f.primary_key and f.name != "shift_entry"
+            ]
+            headers = ["التاريخ", "الوردية"] + [str(f.verbose_name) for f in fields]
+            data_rows = []
+            for inst in rows_qs:
+                e = inst.shift_entry
+                data_rows.append(
+                    [e.entry_date, e.get_shift_display()]
+                    + [
+                        _excel_cell(f, getattr(inst, f.name))
+                        for f in fields
+                    ]
+                )
+            if not data_rows:
+                continue
+
+            label = MODEL_TITLES.get(
+                model.__name__,
+                str(
+                    model._meta.verbose_name_plural
+                    or model._meta.verbose_name
+                    or model.__name__
+                ),
+            )
+            ws = wb.create_sheet(title=f"{code} - {label}"[:31])
+            ws.sheet_view.rightToLeft = True
+            ws.append(headers)
+            for row in data_rows:
+                ws.append(row)
+                ws.cell(row=ws.max_row, column=1).number_format = "yyyy-mm-dd"
+            _style_sheet(ws, len(headers))
+
+    buf = BytesIO()
+    wb.save(buf)
+    buf.seek(0)
+
+    response = HttpResponse(
+        buf.getvalue(),
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    parts = [p.replace("-", "") or "الكل" for p in (date_from, date_to)]
+    filename = f"QC_Records_{parts[0]}_{parts[1]}.xlsx"
+    response["Content-Disposition"] = f'attachment; filename="{filename}"'
+    return response
