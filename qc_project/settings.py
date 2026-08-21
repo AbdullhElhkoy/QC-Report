@@ -88,6 +88,14 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [BASE_DIR / "static"]
+
+# بيانات ضبط الجودة الثابتة اللي بتظهر في فوتر كل تقرير PDF (يومي/أسبوعي/شهري)
+QC_REPORT_DOC_CONTROL = {
+    "form_number": "EV-QC-P-10-F-26",
+    "revision_no": "0/1",
+    "revision_date": "27/01/2026",
+}
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

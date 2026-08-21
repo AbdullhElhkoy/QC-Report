@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+{% load static l10n %}
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<style>
+    @page {
+        size: A4 landscape;
+        margin: 14mm 10mm 18mm 10mm;
+        @bottom-center {
+            content: element(footer);
+        }
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+        font-family: "DejaVu Sans", "Arial", sans-serif;
+        font-size: 8.3px;
+        color: #111;
+        direction: rtl;
+    }
+
+    /* الجداول بتتبنى بترتيب أعمدة إنجليزي (زي التصميم الأصلي)
+       حتى لو باقي الصفحة RTL، فبنقفل اتجاهها LTR بشكل صريح */
+    .ltr-table { direction: ltr; }
+    .ltr-table th, .ltr-table td { text-align: center; }
+
+    .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 4mm;
+    }
+    .header img { height: 16mm; }
+    .header .title {
+        text-align: center;
+        flex: 1;
+    }
+    .header .title h1 {
+        font-size: 15px;
+        margin: 0 0 2px 0;
+        font-weight: bold;
+    }
+    .header .title .date {
+        font-size: 10px;
+        font-weight: bold;
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 1.2mm;
+    }
+    th, td {
+        border: 1px solid #333;
+        padding: 0.5px 3px;
+        text-align: center;
+        vertical-align: middle;
+        line-height: 1.25;
+    }
+
+    .th-blue   { background: #BDD7EE; font-weight: bold; }
+    .th-yellow { background: #FFE699; font-weight: bold; }
+    .th-red    { background: #F4A6A6; font-weight: bold; color: #7a0000; }
+    .th-green  { background: #C6E0B4; font-weight: bold; }
+    .th-grey   { background: #D9D9D9; font-weight: bold; }
+    .cell-nc   { color: #C00000; font-weight: bold; }
+
+    .section-title {
+        background: #1F4E79;
+        color: #fff;
+        font-weight: bold;
+        padding: 2px 4px;
+    }
+
+    /* الفوتر الثابت المتكرر في كل صفحة */
+    #footer {
+        position: running(footer);
+        width: 100%;
+        border-top: 1px solid #333;
+        font-size: 8px;
+        display: flex;
+        justify-content: space-between;
+        padding-top: 2px;
+    }
+    #footer span { padding: 0 4px; }
+
+    .page-break { page-break-before: always; }
+
+    .charts-page { direction: ltr; }
+    .charts-grid img {
+        width: 100%;
+        display: block;
+        margin-bottom: 0.5mm;
+    }
+</style>
+</head>
+<body>
+
+<div id="footer">
+    <span>{{ doc_control.form_number }}</span>
+    <span>صفحة (<span class="page-counter"></span>)</span>
+    <span>تاريخ التعديل: {{ doc_control.revision_date }}</span>
+    <span>ت. الإصدار: {{ doc_control.revision_date }}</span>
+    <span>إصدار / تعديل رقم: {{ doc_control.revision_no }}</span>
+</div>
+
+<div class="header">
+    <img src="{% static 'qc_report/img/logo_evergrow_ar.png' %}" alt="">
+    <div class="title">
+        <h1>Quality Control Report</h1>
+        <div class="date">Date : {{ date|date:"d -n- Y" }}</div>
+    </div>
+    <img src="{% static 'qc_report/img/logo_evergrow_en.png' %}" alt="">
+</div>
+
+{% localize off %}
+<div class="ltr-table">
+
+<!-- ============ SOP UNITS ============ -->
+<table>
+    <thead>
+        <tr class="th-blue">
+            <th colspan="2">UNIT</th>
+            <th>EXP</th><th>DOM</th><th>STD</th><th>NC</th>
+            <th>Defect Reason</th><th>TOTAL</th><th>NOTES</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for unit_row in sop.rows %}
+            {% for p in unit_row.products %}
+            <tr>
+                {% if forloop.first %}
+                <td rowspan="{{ unit_row.products|length }}" class="th-blue">{{ unit_row.label }}</td>
+                {% endif %}
+                <td>{{ p.product_type }}</td>
+                <td>{{ p.exp }}</td><td>{{ p.dom }}</td><td>{{ p.std }}</td>
+                <td class="{% if p.nc %}cell-nc{% endif %}">{{ p.nc }}</td>
+                <td>{{ p.defect_reason|default:"" }}</td>
+                {% if forloop.first %}
+                <td rowspan="{{ unit_row.products|length }}">{{ unit_row.total }}</td>
+                {% endif %}
+                <td>{{ p.notes|default:"" }}</td>
+            </tr>
+            {% endfor %}
+        {% endfor %}
+    </tbody>
+</table>
+
+<table>
+    <thead>
+        <tr class="th-blue">
+            <th colspan="4">SOP UNIT %</th>
+            <th colspan="2" rowspan="3">Car</th>
+            <th colspan="4">BULK</th>
+        </tr>
+        <tr class="th-blue">
+            <th>NC</th><th>STD</th><th>DOM</th><th>EXP</th>
+            <th>EXP</th><th>DOM</th><th>STD</th><th>TOTAL</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="cell-nc">{{ sop.grand.nc }}</td>
+            <td>{{ sop.grand.std }}</td>
+            <td>{{ sop.grand.dom }}</td>
+            <td>{{ sop.grand.exp }}</td>
+            <td>{{ sop.car_summary.car_number_exp }}</td>
+            <td>{{ sop.car_summary.car_number_dom }}</td>
+            <td>{{ sop.car_summary.car_number_std }}</td>
+            <td>{{ sop.car_summary.car_number_total }}</td>
+        </tr>
+        <tr>
+            <td colspan="4"></td>
+            <td>{{ sop.car_summary.weight_exp }}</td>
+            <td>{{ sop.car_summary.weight_dom }}</td>
+            <td>{{ sop.car_summary.weight_std }}</td>
+            <td>{{ sop.car_summary.weight_total }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<!-- ============ DCP ============ -->
+<table>
+    <thead>
+        <tr class="th-blue">
+            <th rowspan="2">DCP</th>
+            <th>B.B</th><th>AS S.B</th><th>TOTAL</th><th>TOTAL</th>
+            <th colspan="2">اختبار معمل / امس</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="th-blue">TOTAL</td>
+            <td>{{ dcp.summary.bb_total }}</td>
+            <td>{{ dcp.summary.as_sb_total }}</td>
+            <td>{{ dcp.summary.total_1 }}</td>
+            <td>{{ dcp.summary.total_2 }}</td>
+            <td>{{ dcp.summary.lab_test_count }}</td>
+            <td>{{ dcp.summary.yesterday_test_count }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<table>
+    <thead>
+        <tr class="th-blue">
+            <th>Total</th><th>Green</th><th>Yellow</th><th>G + Y</th>
+            <th>Blue</th><th>White</th><th>Red</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for c in dcp.categories %}
+        <tr>
+            <td class="th-grey">{{ c.total }}</td>
+            <td>{{ c.green }}</td><td>{{ c.yellow }}</td><td>{{ c.green_yellow }}</td>
+            <td>{{ c.blue }}</td><td>{{ c.white }}</td>
+            <td class="cell-nc">{{ c.red }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<table>
+    <thead>
+        <tr class="th-yellow">
+            <th>Under Test</th><th>DCP WHITE - IM</th><th>OVER</th><th>COLOR</th>
+            <th>P2O5</th><th>MC</th><th>NC</th><th>NOTES / التدوير</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>{{ dcp.under_test }}</td>
+            <td>{{ dcp.white_quality.im }}</td>
+            <td>{{ dcp.white_quality.over }}</td>
+            <td>{{ dcp.white_quality.color }}</td>
+            <td>{{ dcp.white_quality.p2o5 }}</td>
+            <td>{{ dcp.white_quality.mc }}</td>
+            <td class="cell-nc">{{ dcp.white_quality.nc_count }}</td>
+            <td>
+                إجمالي: {{ dcp.rework.total }} —
+                اخضر واصفر: {{ dcp.rework.green_yellow }} —
+                اصفر: {{ dcp.rework.yellow }} —
+                اخضر: {{ dcp.rework.green }}
+            </td>
+        </tr>
+    </tbody>
+</table>
+{% if dcp.notes %}
+<p style="font-size:8px;">{% for n in dcp.notes %}{{ n }}{% if not forloop.last %} — {% endif %}{% endfor %}</p>
+{% endif %}
+
+<!-- ============ PA / SA ============ -->
+<table>
+    <thead>
+        <tr class="th-green">
+            <th colspan="4">PA</th><th colspan="1">SA</th>
+        </tr>
+        <tr class="th-green">
+            <th>JC 43%</th><th>JC 62%</th><th>Cube 43%</th><th>Cube 61%</th><th>JC</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td>{{ pa.jc_43 }}</td><td>{{ pa.jc_62 }}</td>
+            <td>{{ pa.cube_43 }}</td><td>{{ pa.cube_61 }}</td>
+            <td>{{ sa.jc }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<!-- ============ GCC ============ -->
+<table>
+    <thead>
+        <tr class="th-blue">
+            <th>UNIT</th><th></th><th>B.B</th><th></th><th>NC</th><th>Defect Reason</th><th>TOTAL</th><th>NOTES</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for g in gcc %}
+            {% for p in g.packages %}
+                {% if p.total or p.nc %}
+                <tr>
+                    <td rowspan="4" class="th-blue">{{ g.unit }}</td>
+                    <td rowspan="4">{{ p.package_type }}</td>
+                    <td>GREEN</td><td>{{ p.green }}</td>
+                    <td rowspan="4" class="{% if p.nc %}cell-nc{% endif %}">{{ p.nc }}</td>
+                    <td rowspan="4"></td>
+                    <td rowspan="4">{{ p.total }}</td>
+                    <td rowspan="4"></td>
+                </tr>
+                <tr><td>YELLOW</td><td>{{ p.yellow }}</td></tr>
+                <tr><td>WHITE</td><td>{{ p.white }}</td></tr>
+                <tr><td>BLUE</td><td>{{ p.blue }}</td></tr>
+                {% endif %}
+            {% endfor %}
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- ============ LOADING ============ -->
+<table>
+    <thead>
+        <tr class="th-blue">
+            <th>TYPE</th>
+            {% for r in loading.rows %}<th>{{ r.product_type }}</th>{% endfor %}
+            <th>TOTAL</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="th-blue">EXP</td>
+            {% for r in loading.rows %}<td>{{ r.exp }}</td>{% endfor %}
+            <td>{{ loading.grand_total }}</td>
+        </tr>
+        <tr>
+            <td class="th-blue">DOM</td>
+            {% for r in loading.rows %}<td>{{ r.dom }}</td>{% endfor %}
+            <td></td>
+        </tr>
+    </tbody>
+</table>
+
+<table>
+    <tbody>
+        <tr>
+            <td class="th-grey" style="width:20%;">NOTES</td>
+            <td></td>
+            <td class="th-grey" style="width:20%;">الطاحونه مطابق</td>
+        </tr>
+    </tbody>
+</table>
+
+</div> <!-- /.ltr-table -->
+{% endlocalize %}
+
+<!-- ============ صفحة الرسوم البيانية ============ -->
+<div class="page-break charts-page">
+    <div class="charts-grid">
+        <img src="data:image/png;base64,{{ charts.total_qty }}">
+        <img src="data:image/png;base64,{{ charts.dcp }}">
+        <img src="data:image/png;base64,{{ charts.gcc }}">
+        <img src="data:image/png;base64,{{ charts.loading }}">
+    </div>
+</div>
+
+</body>
+</html>

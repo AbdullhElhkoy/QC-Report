@@ -11,7 +11,7 @@
               onclick="location.href='/report/' + document.getElementById('reportDate').value + '/'">عرض</button>
     </form>
     <a href="{% url 'report' next_date %}" class="btn btn-outline-secondary btn-sm">اليوم التالي</a>
-    <button type="button" class="btn btn-dark btn-sm" onclick="window.print()">طباعة / PDF</button>
+    <a href="{% url 'report_pdf' date %}" class="btn btn-dark btn-sm" target="_blank">تصدير PDF</a>
   </div>
 </div>
 

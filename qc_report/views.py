@@ -1,14 +1,17 @@
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
-from django.http import Http404
+from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.utils import timezone
 
 from .aggregations import full_daily_report
+from .pdf_charts import generate_report_charts
 from .forms import (
     DCPColorGradingForm,
     DCPReworkForm,
@@ -447,3 +450,36 @@ def daily_report(request, date=None):
     context["next_date"] = report_date + timezone.timedelta(days=1)
     context["today"] = timezone.localdate()
     return render(request, "report.html", context)
+
+
+@login_required
+def daily_report_pdf(request, date=None):
+    if not request.user.is_manager:
+        messages.error(request, "التقرير اليومي متاح للمدير فقط.")
+        return redirect("dashboard")
+    report_date = date or timezone.localdate()
+
+    # الاستيراد هنا (lazy import) عشان WeasyPrint يحتاج مكتبات نظام (Cairo/Pango)
+    # قد لا تكون متاحة في كل بيئة، فمنعزلها عن باقي التطبيق حتى لا يفشل التشغيل كله لو غابت.
+    try:
+        from weasyprint import HTML
+    except (ImportError, OSError):
+        messages.error(
+            request,
+            "خدمة PDF غير متاحة على هذه البيئة. ثبّت weasyprint ومكتبات النظام المطلوبة "
+            "(Pango/Cairo) أو استخدم زر الطباعة من المتصفح.",
+        )
+        return redirect("report", report_date)
+
+    context = full_daily_report(report_date)
+    context["charts"] = generate_report_charts(context["charts"])
+    context["doc_control"] = settings.QC_REPORT_DOC_CONTROL
+
+    html = render_to_string("report_pdf.html", context, request=request)
+
+    pdf_bytes = HTML(string=html, base_url=request.build_absolute_uri("/")).write_pdf()
+
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    filename = f"QC_Report_{report_date.strftime('%d-%m-%Y')}.pdf"
+    response["Content-Disposition"] = f'inline; filename="{filename}"'
+    return response
