@@ -151,12 +151,9 @@
     <thead>
         <tr class="th-blue">
             <th colspan="4">SOP UNIT %</th>
-            <th colspan="2" rowspan="3">Car</th>
-            <th colspan="4">BULK</th>
         </tr>
         <tr class="th-blue">
             <th>NC</th><th>STD</th><th>DOM</th><th>EXP</th>
-            <th>EXP</th><th>DOM</th><th>STD</th><th>TOTAL</th>
         </tr>
     </thead>
     <tbody>
@@ -165,17 +162,6 @@
             <td>{{ sop.grand.std }}</td>
             <td>{{ sop.grand.dom }}</td>
             <td>{{ sop.grand.exp }}</td>
-            <td>{{ sop.car_summary.car_number_exp }}</td>
-            <td>{{ sop.car_summary.car_number_dom }}</td>
-            <td>{{ sop.car_summary.car_number_std }}</td>
-            <td>{{ sop.car_summary.car_number_total }}</td>
-        </tr>
-        <tr>
-            <td colspan="4"></td>
-            <td>{{ sop.car_summary.weight_exp }}</td>
-            <td>{{ sop.car_summary.weight_dom }}</td>
-            <td>{{ sop.car_summary.weight_std }}</td>
-            <td>{{ sop.car_summary.weight_total }}</td>
         </tr>
     </tbody>
 </table>

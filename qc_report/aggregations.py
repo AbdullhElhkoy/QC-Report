@@ -95,23 +95,11 @@ def sop_section(start, end=None):
         "dom": _pct(grand["dom"], grand_total),
         "exp": _pct(grand["exp"], grand_total),
     }
-    bulk = [i for i in items if i.product_type == ProductType.BULK]
-    car_summary = {
-        "car_number_exp": sum(1 for i in bulk if i.car_number is not None and i.exp > 0),
-        "car_number_dom": sum(1 for i in bulk if i.car_number is not None and i.dom > 0),
-        "car_number_std": sum(1 for i in bulk if i.car_number is not None and i.std > 0),
-        "car_number_total": sum(1 for i in bulk if i.car_number is not None),
-        "weight_exp": sum((i.car_weight or ZERO for i in bulk if i.exp > 0), ZERO),
-        "weight_dom": sum((i.car_weight or ZERO for i in bulk if i.dom > 0), ZERO),
-        "weight_std": sum((i.car_weight or ZERO for i in bulk if i.std > 0), ZERO),
-        "weight_total": sum((i.car_weight or ZERO for i in bulk), ZERO),
-    }
     return {
         "rows": rows,
         "percentages": percentages,
         "grand": grand,
         "grand_total": grand_total,
-        "car_summary": car_summary,
     }
 
 
