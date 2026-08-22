@@ -312,24 +312,27 @@
 
 <h5>GCC</h5>
 <div class="table-responsive mb-4">
-  <table class="table table-bordered text-center align-middle bg-white">
-    <thead class="table-light">
-      <tr><th>Unit</th><th>Package</th><th>Green</th><th>Yellow</th><th>White</th><th>Blue</th><th>NC</th><th>Total</th></tr>
+  <table class="table table-bordered text-center align-middle bg-white table-sm" style="border-collapse:collapse;">
+    <tr><th colspan="10" style="background:#274E13;color:#fff;font-weight:700;">GCC</th></tr>
+    <thead style="background:#9FC5E8;">
+      <tr><th>UNIT</th><th colspan="4">BB</th><th>SB</th><th>NC</th><th>Defect Reason</th><th>TOTAL</th><th>NOTES</th></tr>
     </thead>
     <tbody>
       {% for g in gcc %}
-        {% for p in g.packages %}
+        {% for c in g.colors %}
           <tr>
-            {% if forloop.first %}<td rowspan="{{ g.packages|length }}">{{ g.unit }}</td>{% endif %}
-            <td>{{ p.package_type }}</td>
-            <td>{{ p.green }}</td><td>{{ p.yellow }}</td><td>{{ p.white }}</td><td>{{ p.blue }}</td>
-            <td>{{ p.nc }}</td><td>{{ p.total }}</td>
+            {% if forloop.first %}<td rowspan="4" style="background:#9FC5E8;font-weight:700;">{{ g.unit }}</td>{% endif %}
+            <td {% if c.color == 'GREEN' %}style="background:#B6D7A8;font-weight:600;"{% elif c.color == 'YELLOW' %}style="background:#FFE599;font-weight:600;"{% elif c.color == 'BLUE' %}style="background:#9FC5E8;font-weight:600;"{% else %}style="background:#ffffff;font-weight:600;"{% endif %}>{{ c.label }}</td>
+            <td>{{ c.bb }}</td>
+            {% if forloop.first %}
+              <td rowspan="4">{{ g.sb }}</td>
+              <td rowspan="4" class="text-danger fw-bold">{{ g.nc }}</td>
+            {% endif %}
+            <td>{{ c.reasons }}</td>
+            {% if forloop.first %}<td rowspan="4" class="text-primary fw-bold fs-5">{{ g.total }}</td>{% endif %}
+            <td>{{ c.notes }}</td>
           </tr>
         {% endfor %}
-        <tr class="table-secondary fw-bold">
-          <td colspan="7">Total {{ g.unit }}</td>
-          <td>{{ g.grand_total }}</td>
-        </tr>
       {% endfor %}
     </tbody>
   </table>
@@ -337,21 +340,15 @@
 
 <h5>Loading</h5>
 <div class="table-responsive mb-4">
-  <table class="table table-bordered text-center align-middle bg-white">
+  <table class="table table-bordered text-center align-middle bg-white table-sm">
     <thead class="table-light">
-      <tr><th>Product</th><th>EXP</th><th>DOM</th><th>Total</th></tr>
+      <tr><th>TYPE</th>{% for r in loading.rows %}<th>{{ r.product_type }}</th>{% endfor %}</tr>
     </thead>
     <tbody>
-      {% for r in loading.rows %}
-        <tr>
-          <th class="table-light">{{ r.product_type }}</th>
-          <td>{{ r.exp }}</td><td>{{ r.dom }}</td><td>{{ r.total }}</td>
-        </tr>
-      {% endfor %}
-      <tr class="table-secondary fw-bold">
-        <td colspan="3">Grand Total</td>
-        <td>{{ loading.grand_total }}</td>
-      </tr>
+      <tr><th class="table-light">EXP</th>{% for r in loading.rows %}<td>{{ r.exp }}</td>{% endfor %}</tr>
+      <tr><th class="table-light">DOM</th>{% for r in loading.rows %}<td>{{ r.dom }}</td>{% endfor %}</tr>
+      <tr><th class="table-light">Total</th>{% for r in loading.rows %}<td class="fw-bold">{{ r.total }}</td>{% endfor %}</tr>
+      <tr class="table-secondary fw-bold"><td>Grand Total</td><td colspan="{{ loading.rows|length }}">{{ loading.grand_total }}</td></tr>
     </tbody>
   </table>
 </div>

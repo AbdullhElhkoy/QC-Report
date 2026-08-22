@@ -10,7 +10,9 @@ from .models import (
     DCPReasonCategory,
     DCPTests,
     DCPSBRow,
-    GCCLineItem,
+    GCCColor,
+    GCCColorRow,
+    GCCSummary,
     LoadingLineItem,
     LoadingProductType,
     PackingFactory,
@@ -328,36 +330,58 @@ def sa_section(start, end=None, shift=None):
 
 
 def gcc_section(start, end=None, shift=None):
+    """جدول GCC بالعرض: صف لكل لون (BB + سبب العيب + ملاحظة) + SB + NC."""
     start, end = _normalize_range(start, end)
+    entries_q = ShiftEntry.objects.filter(
+        unit__in=("GCC1", "GCC2"), entry_date__range=(start, end)
+    )
+    if shift:
+        entries_q = entries_q.filter(shift=shift)
+
+    rows_qs = GCCColorRow.objects.filter(shift_entry__in=entries_q)
+    sum_qs = GCCSummary.objects.filter(shift_entry__in=entries_q)
+    sums_by_unit = {}
+    for sm in sum_qs.select_related("shift_entry"):
+        acc = sums_by_unit.setdefault(sm.shift_entry.unit, {"sb": ZERO, "nc": ZERO})
+        acc["sb"] += sm.sb
+        acc["nc"] += sm.nc
+    bb_by_unit_color = {}
+    reasons_by_unit_color = {}
+    notes_by_unit_color = {}
+    for r in rows_qs.select_related("shift_entry"):
+        u = r.shift_entry.unit
+        bb_by_unit_color[(u, r.color)] = bb_by_unit_color.get((u, r.color), 0) + r.bb
+        if r.defect_reason:
+            reasons_by_unit_color.setdefault((u, r.color), []).append(r.defect_reason)
+        if r.note:
+            notes_by_unit_color.setdefault((u, r.color), []).append(r.note)
+
     units_data = []
     for unit in ("GCC1", "GCC2"):
-        items = GCCLineItem.objects.filter(
-            shift_entry__unit=unit, shift_entry__entry_date__range=(start, end)
-        )
-        if shift:
-            items = items.filter(shift_entry__shift=shift)
-        package_rows = []
-        unit_totals = {"green": 0, "yellow": 0, "white": 0, "blue": 0}
-        for pt in PackageType:
-            agg = items.filter(package_type=pt).aggregate(
-                green=Sum("green"),
-                yellow=Sum("yellow"),
-                white=Sum("white"),
-                blue=Sum("blue"),
-                nc=Sum("nc"),
+        colors = []
+        total = ZERO
+        for color in GCCColor:
+            bb_val = bb_by_unit_color.get((unit, color.value), 0)
+            total += bb_val
+            colors.append(
+                {
+                    "color": color.value,
+                    "label": color.name,
+                    "bb": bb_val,
+                    "reasons": " & ".join(reasons_by_unit_color.get((unit, color.value), [])),
+                    "notes": " & ".join(notes_by_unit_color.get((unit, color.value), [])),
+                }
             )
-            row = {k: v or 0 for k, v in agg.items()}
-            row["package_type"] = pt.label
-            row["total"] = row["green"] + row["yellow"] + row["white"] + row["blue"]
-            package_rows.append(row)
-            for key in unit_totals:
-                unit_totals[key] += row[key]
+        sb_val = sums_by_unit.get(unit, {}).get("sb", ZERO)
+        nc_val = sums_by_unit.get(unit, {}).get("nc", ZERO)
+        total += sb_val
         units_data.append(
             {
                 "unit": unit,
-                "packages": package_rows,
-                "totals": unit_totals,
-                "grand_total": sum(unit_totals.values()),
+                "colors": colors,
+                "sb": sb_val,
+                "nc": nc_val,
+                "total": total,
             }
         )
     return units_data
@@ -402,12 +426,13 @@ def charts_data(start, end=None, shift=None):
     cp_qty = sop_qty_for(["C_PACKING"])
 
     def gcc_colors(unit):
-        agg = GCCLineItem.objects.filter(
-            shift_entry__unit=unit, **date_filter, **shift_filter
-        ).aggregate(
-            green=Sum("green"), yellow=Sum("yellow"), white=Sum("white"), blue=Sum("blue")
-        )
-        return {k: v or 0 for k, v in agg.items()}
+        qs = GCCColorRow.objects.filter(shift_entry__unit=unit).filter(**{
+            "shift_entry__entry_date__range": (start, end), **shift_filter
+        })
+        out = {c.value: 0 for c in GCCColor}
+        for r in qs:
+            out[r.color] += r.bb
+        return out
 
     _dcp_sec = dcp_section(start, end, shift)
     dcp_chart = _dcp_sec["bb_total"]
@@ -419,8 +444,8 @@ def charts_data(start, end=None, shift=None):
                 float(sop_qty),
                 float(gsop_qty),
                 float(cp_qty),
-                float(gcc_section(start, end, shift)[0]["grand_total"]),
-                float(gcc_section(start, end, shift)[1]["grand_total"]),
+                float(gcc_section(start, end, shift)[0]["total"]),
+                float(gcc_section(start, end, shift)[1]["total"]),
                 float(_dcp_sec["totals"]["total"]),
                 float(pa_section(start, end, shift)["total"]),
                 float(sa_section(start, end, shift)["total"]),
@@ -449,14 +474,14 @@ def charts_data(start, end=None, shift=None):
                 "GCC2 Blue",
             ],
             "values": [
-                gcc_colors("GCC1")["green"],
-                gcc_colors("GCC1")["yellow"],
-                gcc_colors("GCC1")["white"],
-                gcc_colors("GCC1")["blue"],
-                gcc_colors("GCC2")["green"],
-                gcc_colors("GCC2")["yellow"],
-                gcc_colors("GCC2")["white"],
-                gcc_colors("GCC2")["blue"],
+                gcc_colors("GCC1")["GREEN"],
+                gcc_colors("GCC1")["YELLOW"],
+                gcc_colors("GCC1")["WHITE"],
+                gcc_colors("GCC1")["BLUE"],
+                gcc_colors("GCC2")["GREEN"],
+                gcc_colors("GCC2")["YELLOW"],
+                gcc_colors("GCC2")["WHITE"],
+                gcc_colors("GCC2")["BLUE"],
             ],
         },
         "loading": {

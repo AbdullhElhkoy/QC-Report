@@ -8,7 +8,8 @@ from .models import (
     DCPReasonLine,
     DCPTests,
     DCPSBRow,
-    GCCLineItem,
+    GCCColorRow,
+    GCCSummary,
     LoadingLineItem,
     PackingType,
     ShiftEntry,
@@ -196,17 +197,48 @@ class PackingTableForm(forms.Form):
         return cleaned
 
 
-class GCCLineItemForm(ZeroDefaultMixin, forms.ModelForm):
-    zero_fields = ("green", "yellow", "white", "blue", "nc")
+class GCCSummaryForm(ZeroDefaultMixin, forms.ModelForm):
+    zero_fields = ("sb", "nc")
 
     class Meta:
-        model = GCCLineItem
-        fields = ["green", "yellow", "white", "blue", "nc", "defect_reason", "notes"]
+        model = GCCSummary
+        fields = ["sb", "nc"]
         widgets = {
-            "notes": forms.Textarea(attrs={"rows": 1, "class": "form-control form-control-sm"}),
+            "sb": forms.NumberInput(
+                attrs={"type": "number", "step": "any", "min": "0",
+                       "class": "form-control form-control-sm text-center gcc-sb"}
+            ),
+            "nc": forms.NumberInput(
+                attrs={"type": "number", "step": "any", "min": "0",
+                       "class": "form-control form-control-sm text-center"}
+            ),
+        }
+
+
+def gcc_color_form(color, data=None, entry=None):
+    """فورم صف لون واحد لجدول GCC."""
+    instance = None
+    if entry is not None:
+        instance = entry.gcc_rows.filter(color=color).first()
+    form = GCCColorRowForm(data, instance=instance, prefix=f"gcc_{color.lower()}")
+    return form
+
+
+class GCCColorRowForm(ZeroDefaultMixin, forms.ModelForm):
+    zero_fields = ("bb",)
+
+    class Meta:
+        model = GCCColorRow
+        fields = ["bb", "defect_reason", "note"]
+        widgets = {
+            "bb": forms.NumberInput(
+                attrs={"type": "number", "step": "1", "min": "0",
+                       "class": "form-control form-control-sm text-center gcc-bb"}
+            ),
             "defect_reason": forms.TextInput(
                 attrs={"class": "form-control form-control-sm"}
             ),
+            "note": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
         }
 
 

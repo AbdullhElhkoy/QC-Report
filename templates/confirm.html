@@ -67,19 +67,29 @@
       </div>
     {% endif %}
 
-    {% if gcc_items %}
+    {% if gcc_rows %}
       <h6>GCC</h6>
-      <table class="table table-bordered text-center align-middle">
-        <thead class="table-light">
-          <tr><th>نوع العبوة</th><th>أخضر</th><th>أصفر</th><th>أبيض</th><th>أزرق</th><th>NC</th><th>الإجمالي</th></tr>
+      <table class="table table-bordered text-center align-middle table-sm" style="border-collapse:collapse;">
+        <tr><th colspan="4" style="background:#274E13;color:#fff;">GCC</th></tr>
+        <thead style="background:#9FC5E8;">
+          <tr><th>BB</th><th>SB</th><th>NC</th><th>TOTAL</th></tr>
         </thead>
         <tbody>
-          {% for i in gcc_items %}
-            <tr>
-              <td>{{ i.get_package_type_display }}</td>
-              <td>{{ i.green }}</td><td>{{ i.yellow }}</td><td>{{ i.white }}</td><td>{{ i.blue }}</td>
-              <td>{{ i.nc }}</td><td>{{ i.total }}</td>
-            </tr>
+          <tr>
+            <td>{% for c in gcc_rows %}{{ c.color }}: {{ c.bb }}{% if not forloop.last %} & {% endif %}{% endfor %}</td>
+            <td>{{ gcc_summary.sb }}</td>
+            <td class="text-danger fw-bold">{{ gcc_summary.nc }}</td>
+            <td class="text-primary fw-bold">{{ gcc_total }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <table class="table table-bordered text-center align-middle table-sm" style="border-collapse:collapse;">
+        <thead style="background:#9FC5E8;">
+          <tr><th>Color</th><th>Defect Reason</th><th>NOTES</th></tr>
+        </thead>
+        <tbody>
+          {% for c in gcc_rows %}
+            <tr><td>{{ c.color }}</td><td>{{ c.defect_reason }}</td><td>{{ c.note }}</td></tr>
           {% endfor %}
         </tbody>
       </table>

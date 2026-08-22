@@ -4,33 +4,53 @@
 <h3 class="mb-1">{{ unit_label }}</h3>
 <p class="text-muted">إدخال بيانات الوردية</p>
 
+<style>
+  .gcc-table { border-collapse: collapse; width: 100%; }
+  .gcc-table th, .gcc-table td {
+    border: 1px solid #8a8a8a;
+    text-align: center;
+    vertical-align: middle;
+    padding: 4px 6px;
+  }
+  .gcc-title { background: #274E13; color: #fff; font-weight: 700; letter-spacing: 1px; }
+  .gcc-head { background: #9FC5E8; color: #1c1c1c; font-weight: 700; }
+  .gcc-green { background: #B6D7A8; }
+  .gcc-yellow { background: #FFE599; }
+  .gcc-blue { background: #9FC5E8; }
+  .gcc-white { background: #ffffff; }
+</style>
+
 <form method="post" class="card">
   <div class="card-body">
     {% csrf_token %}
     {% include "partials/shift_fields.html" %}
 
     <div class="table-responsive">
-      <table class="table excel-grid align-middle text-center">
-        <thead class="table-light">
+      <table class="gcc-table">
+        <tr><th class="gcc-title" colspan="10">GCC</th></tr>
+        <tr>
+          <th class="gcc-head">UNIT</th>
+          <th class="gcc-head" colspan="4">BB</th>
+          <th class="gcc-head">SB</th>
+          <th class="gcc-head">NC</th>
+          <th class="gcc-head">Defect Reason</th>
+          <th class="gcc-head">TOTAL</th>
+          <th class="gcc-head">NOTES</th>
+        </tr>
+        {% for row in gcc_color_forms %}
           <tr>
-            <th>نوع العبوة</th><th>أخضر</th><th>أصفر</th><th>أبيض</th><th>أزرق</th>
-            <th>NC</th><th>سبب العيب</th><th>ملاحظات</th>
+            {% if forloop.first %}<td rowspan="4" class="gcc-head">{{ unit_label }}</td>{% endif %}
+            <td class="gcc-{{ row.color }}">{{ row.label }}</td>
+            <td>{{ row.form.bb }}</td>
+            {% if forloop.first %}
+              <td rowspan="4">{{ gcc_sum_form.sb }}</td>
+              <td rowspan="4">{{ gcc_sum_form.nc }}</td>
+            {% endif %}
+            <td>{{ row.form.defect_reason }}</td>
+            {% if forloop.first %}<td rowspan="4"><span id="gccTotal" class="fw-bold text-primary fs-5">0</span></td>{% endif %}
+            <td>{{ row.form.note }}</td>
           </tr>
-        </thead>
-        <tbody>
-          {% for row in rows %}
-            <tr>
-              <th class="table-light">{{ row.label }}</th>
-              <td>{{ row.form.green }}</td>
-              <td>{{ row.form.yellow }}</td>
-              <td>{{ row.form.white }}</td>
-              <td>{{ row.form.blue }}</td>
-              <td>{{ row.form.nc }}</td>
-              <td>{{ row.form.defect_reason }}</td>
-              <td>{{ row.form.notes }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
+        {% endfor %}
       </table>
     </div>
 
@@ -38,4 +58,22 @@
     <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary mt-3">إلغاء</a>
   </div>
 </form>
+
+<script>
+(function () {
+  function calc() {
+    let total = 0;
+    document.querySelectorAll('.gcc-bb, .gcc-sb').forEach(function (i) {
+      const v = parseFloat(i.value);
+      if (!isNaN(v)) total += v;
+    });
+    const el = document.getElementById('gccTotal');
+    if (el) el.textContent = total.toLocaleString('en-US');
+  }
+  document.addEventListener('input', function (e) {
+    if (e.target.matches('.gcc-bb') || e.target.matches('.gcc-sb')) calc();
+  });
+  calc();
+})();
+</script>
 {% endblock %}

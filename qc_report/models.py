@@ -258,6 +258,49 @@ class DCPTests(models.Model):
         return f"Tests - {self.shift_entry}"
 
 
+class GCCColor(models.TextChoices):
+    GREEN = "GREEN", "GREEN"
+    YELLOW = "YELLOW", "YELLOW"
+    BLUE = "BLUE", "BLUE"
+    WHITE = "WHITE", "WHITE"
+
+
+class GCCColorRow(models.Model):
+    """صف لون في جدول GCC: عدد BB + سبب العيب + ملاحظة."""
+
+    shift_entry = models.ForeignKey(
+        ShiftEntry, on_delete=models.CASCADE, related_name="gcc_rows"
+    )
+    color = models.CharField("اللون", max_length=10, choices=GCCColor.choices)
+    bb = models.PositiveIntegerField("BB", default=0)
+    defect_reason = models.CharField("Defect Reason", max_length=200, blank=True)
+    note = models.CharField("NOTES", max_length=200, blank=True)
+
+    class Meta:
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["shift_entry", "color"], name="uniq_gcc_color_per_entry"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.shift_entry} - {self.color}: {self.bb}"
+
+
+class GCCSummary(models.Model):
+    """SB وNC لجدول GCC (خليتين واحدة لكل إدخال)."""
+
+    shift_entry = models.OneToOneField(
+        ShiftEntry, on_delete=models.CASCADE, related_name="gcc_summary"
+    )
+    sb = models.DecimalField("SB", max_digits=10, decimal_places=2, default=0)
+    nc = models.DecimalField("NC", max_digits=10, decimal_places=2, default=0)
+
+    def __str__(self):
+        return f"GCC Summary - {self.shift_entry}"
+
+
 class PackingFactory(models.TextChoices):
     PA = "PA", "PA"
     SA = "SA", "SA"
@@ -303,30 +346,6 @@ class PackingLineItem(models.Model):
 
     def __str__(self):
         return f"{self.packing_type.name}: {self.value} ({self.shift_entry})"
-
-
-class GCCLineItem(models.Model):
-    shift_entry = models.ForeignKey(
-        ShiftEntry, on_delete=models.CASCADE, related_name="gcc_line_items"
-    )
-    package_type = models.CharField("نوع العبوة", max_length=10, choices=PackageType.choices)
-    green = models.PositiveIntegerField("أخضر", default=0)
-    yellow = models.PositiveIntegerField("أصفر", default=0)
-    white = models.PositiveIntegerField("أبيض", default=0)
-    blue = models.PositiveIntegerField("أزرق", default=0)
-    nc = models.DecimalField("NC", max_digits=10, decimal_places=2, default=0)
-    defect_reason = models.CharField("سبب العيب", max_length=100, blank=True)
-    notes = models.TextField("ملاحظات", blank=True)
-
-    class Meta:
-        ordering = ["package_type"]
-
-    @property
-    def total(self):
-        return self.green + self.yellow + self.white + self.blue
-
-    def __str__(self):
-        return f"{self.shift_entry} - {self.get_package_type_display()}"
 
 
 SOP_BULK_UNITS = {"SOP_A", "SOP_B", "SOP_C", "SOP_D"}

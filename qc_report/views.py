@@ -23,8 +23,10 @@ from .forms import (
     DCPTestsForm,
     DCPSBRowForm,
     PackingTableForm,
+    GCCSummaryForm,
     build_dcp_reason_line_form,
-    GCCLineItemForm,
+    gcc_color_form,
+    GCCColorRowForm,
     LoadingLineItemForm,
     ShiftEntryForm,
     SOPLineItemForm,
@@ -38,7 +40,9 @@ from .models import (
     DCPReasonLine,
     DCPTests,
     DCPSBRow,
-    GCCLineItem,
+    GCCColorRow,
+    GCCColor,
+    GCCSummary,
     LoadingLineItem,
     LoadingProductType,
     PackingFactory,
@@ -67,7 +71,8 @@ MODEL_TITLES = {
     "DCPRework": "التدوير",
     "PALineItem": "بنود PA",
     "SALineItem": "بنود SA",
-    "PackingLineItem": "بنود التعبئة (PA/SA)",    "GCCLineItem": "بنود GCC",
+    "PackingLineItem": "بنود التعبئة (PA/SA)",    "GCCColorRow": "جدول GCC - الألوان",
+    "GCCSummary": "SB / NC",
     "LoadingLineItem": "بنود التحميل",
     "BulkLog": "عربيات BULK",
     "DCPBBRow": "جدول B.B",
@@ -91,7 +96,8 @@ _SNAPSHOT_RELATED = [
     ("pa_line_items", ["jc_43", "jc_62", "cube_43", "cube_61"]),
     ("sa_line_items", ["jc"]),
     ("packing_items", ["packing_type", "value"]),
-    ("gcc_line_items", ["package_type", "green", "yellow", "white", "blue", "nc", "defect_reason", "notes"]),
+    ("gcc_rows", ["color", "bb", "defect_reason", "note"]),
+    ("gcc_summary", ["sb", "nc"]),
     ("loading_line_items", ["product_type", "exp", "dom"]),
 ]
 
@@ -114,7 +120,7 @@ def snapshot_entry(entry):
         "shift": entry.shift,
     }
     for name, fields in _SNAPSHOT_RELATED:
-        if name in ("sop_line_items", "gcc_line_items", "loading_line_items"):
+        if name in ("sop_line_items", "loading_line_items", "gcc_rows"):
             data[name] = [
                 {f: _jsonable(getattr(obj, f)) for f in fields}
                 for obj in getattr(entry, name).all()
@@ -223,27 +229,6 @@ def save_sop_rows(entry, data):
             obj = form.save(commit=False)
             obj.shift_entry = entry
             obj.product_type = pt
-            obj.save()
-
-
-def build_gcc_rows(data=None, entry=None):
-    rows = []
-    for pt in PackageType:
-        instance = None
-        if entry is not None:
-            instance = entry.gcc_line_items.filter(package_type=pt).first()
-        form = GCCLineItemForm(data, instance=instance, prefix=f"row_{pt}")
-        rows.append({"form": form, "label": PackageType(pt).label})
-    return rows
-
-
-def save_gcc_rows(entry, data):
-    for pt in PackageType:
-        form = GCCLineItemForm(data, prefix=f"row_{pt}")
-        if form.is_valid():
-            obj = form.save(commit=False)
-            obj.shift_entry = entry
-            obj.package_type = pt
             obj.save()
 
 
@@ -442,7 +427,16 @@ def _build_all_forms(unit, data=None, entry=None):
             instance = getattr(entry, "bulk_log", None) if entry is not None else None
             ctx["bulk_form"] = BulkLogForm(data, instance=instance, prefix="bulk")
     elif unit in ("GCC1", "GCC2"):
-        ctx["rows"] = build_gcc_rows(data, entry)
+        ctx["gcc_color_forms"] = [
+            {
+                "color": c.value,
+                "label": c.name,
+                "form": gcc_color_form(c.value, data=data, entry=entry),
+            }
+            for c in GCCColor
+        ]
+        summary = getattr(entry, "gcc_summary", None) if entry is not None else None
+        ctx["gcc_sum_form"] = GCCSummaryForm(data, instance=summary, prefix="gcc_sum")
     elif unit == "LOADING":
         ctx["rows"] = build_loading_rows(data, entry)
     elif unit == "DCP":
@@ -462,6 +456,10 @@ def _build_all_forms(unit, data=None, entry=None):
 def _flatten_forms(ctx):
     forms = [ctx["shift_form"]]
     forms.extend(r["form"] for r in ctx["rows"])
+    if ctx.get("gcc_color_forms"):
+        forms.extend(r["form"] for r in ctx["gcc_color_forms"])
+        if ctx.get("gcc_sum_form"):
+            forms.append(ctx["gcc_sum_form"])
     if ctx.get("bulk_form"):
         forms.append(ctx["bulk_form"])
     if ctx["dcp"]:
@@ -494,7 +492,20 @@ def _save_related(entry, data):
                 obj.shift_entry = entry
                 obj.save()
     elif unit in ("GCC1", "GCC2"):
-        save_gcc_rows(entry, data)
+        for c in GCCColor:
+            form = gcc_color_form(c.value, data=data, entry=entry)
+            if not form.is_valid():
+                raise ValidationError("بيانات GCC غير صحيحة.")
+            obj = form.save(commit=False)
+            obj.shift_entry = entry
+            obj.color = c.value
+            obj.save()
+        summary = getattr(entry, "gcc_summary", None)
+        sum_form = GCCSummaryForm(data, instance=summary, prefix="gcc_sum")
+        if sum_form.is_valid():
+            obj = sum_form.save(commit=False)
+            obj.shift_entry = entry
+            obj.save()
     elif unit == "LOADING":
         save_loading_rows(entry, data)
     elif unit == "DCP":
@@ -657,7 +668,11 @@ def entry_summary_context(entry):
         ctx["pa_items"] = [i for i in items if i.packing_type.factory == "PA"]
         ctx["sa_items"] = [i for i in items if i.packing_type.factory == "SA"]
     elif unit in ("GCC1", "GCC2"):
-        ctx["gcc_items"] = entry.gcc_line_items.all()
+        ctx["gcc_rows"] = entry.gcc_rows.all()
+        summary = getattr(entry, "gcc_summary", None)
+        ctx["gcc_summary"] = summary
+        sb_val = summary.sb if summary else 0
+        ctx["gcc_total"] = sum(r.bb for r in ctx["gcc_rows"]) + sb_val
     elif unit == "LOADING":
         ctx["loading_items"] = entry.loading_line_items.all()
     return ctx
@@ -750,7 +765,8 @@ _REVISION_TITLES = [
     ("pa_line_items", "بنود PA (قديم)"),
     ("sa_line_items", "بنود SA (قديم)"),
     ("packing_items", "بنود التعبئة (PA/SA)"),
-    ("gcc_line_items", "بنود GCC"),
+    ("gcc_rows", "جدول GCC - الألوان"),
+    ("gcc_summary", "SB / NC"),
     ("loading_line_items", "بنود التحميل"),
     ("dcp_reason_lines", "أسباب الأبيض والأحمر"),
 ]

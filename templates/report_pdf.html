@@ -355,26 +355,24 @@
 <table>
     <thead>
         <tr class="th-blue">
-            <th>UNIT</th><th></th><th>B.B</th><th></th><th>NC</th><th>Defect Reason</th><th>TOTAL</th><th>NOTES</th>
+            <th>UNIT</th><th colspan="4">BB</th><th>SB</th><th>NC</th><th>Defect Reason</th><th>TOTAL</th><th>NOTES</th>
         </tr>
     </thead>
     <tbody>
         {% for g in gcc %}
-            {% for p in g.packages %}
-                {% if p.total or p.nc %}
+            {% for c in g.colors %}
                 <tr>
-                    <td rowspan="4" class="th-blue">{{ g.unit }}</td>
-                    <td rowspan="4">{{ p.package_type }}</td>
-                    <td>GREEN</td><td>{{ p.green }}</td>
-                    <td rowspan="4" class="{% if p.nc %}cell-nc{% endif %}">{{ p.nc }}</td>
-                    <td rowspan="4"></td>
-                    <td rowspan="4">{{ p.total }}</td>
-                    <td rowspan="4"></td>
+                    {% if forloop.first %}<td rowspan="4" class="th-blue">{{ g.unit }}</td>{% endif %}
+                    <td {% if c.color == 'GREEN' %}style="background:#B6D7A8;font-weight:bold;"{% elif c.color == 'YELLOW' %}style="background:#FFE599;font-weight:bold;"{% elif c.color == 'BLUE' %}style="background:#9FC5E8;font-weight:bold;"{% else %}style="background:#ffffff;font-weight:bold;"{% endif %}>{{ c.label }}</td>
+                    <td>{{ c.bb }}</td>
+                    {% if forloop.first %}
+                        <td rowspan="4">{{ g.sb }}</td>
+                        <td rowspan="4" class="{% if g.nc %}cell-nc{% endif %}">{{ g.nc }}</td>
+                    {% endif %}
+                    <td>{{ c.reasons }}</td>
+                    {% if forloop.first %}<td rowspan="4" style="font-weight:bold;color:#1155cc;">{{ g.total }}</td>{% endif %}
+                    <td>{{ c.notes }}</td>
                 </tr>
-                <tr><td>YELLOW</td><td>{{ p.yellow }}</td></tr>
-                <tr><td>WHITE</td><td>{{ p.white }}</td></tr>
-                <tr><td>BLUE</td><td>{{ p.blue }}</td></tr>
-                {% endif %}
             {% endfor %}
         {% endfor %}
     </tbody>

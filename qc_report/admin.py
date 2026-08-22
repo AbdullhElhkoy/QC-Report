@@ -8,7 +8,8 @@ from .models import (
     DCPTests,
     DCPSBRow,
     EntryRevision,
-    GCCLineItem,
+    GCCColorRow,
+    GCCSummary,
     LoadingLineItem,
     PackingLineItem,
     PackingType,
@@ -109,9 +110,16 @@ class SALineItemInline(admin.TabularInline):
     verbose_name = "بند SA"
 
 
-class GCCLineItemInline(admin.TabularInline):
-    model = GCCLineItem
+class GCCColorRowInline(admin.TabularInline):
+    model = GCCColorRow
     extra = 0
+    max_num = 4
+
+
+class GCCSummaryInline(admin.StackedInline):
+    model = GCCSummary
+    extra = 0
+    max_num = 1
 
 
 class LoadingLineItemInline(admin.TabularInline):
@@ -157,7 +165,7 @@ class ShiftEntryAdmin(admin.ModelAdmin):
         if unit in ("PA", "SA"):
             return [PackingLineItemInline]
         if unit in ("GCC1", "GCC2"):
-            return [GCCLineItemInline]
+            return [GCCColorRowInline, GCCSummaryInline]
         if unit == "LOADING":
             return [LoadingLineItemInline]
         return []
