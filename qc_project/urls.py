@@ -8,5 +8,6 @@ register_converter(DateConverter, "date")
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("accounts/", include("django.contrib.auth.urls")),
+    path("api/", include("qc_report.api_urls")),
     path("", include("qc_report.urls")),
 ]
