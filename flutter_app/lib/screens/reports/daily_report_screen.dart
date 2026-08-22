@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../api/reports_repository.dart';
+import '../../main.dart';
 import '../../widgets/app_scaffold.dart';
 
 /// شاشة التقرير اليومي (مدير فقط): ملخص JSON + تحميل PDF/Excel.
@@ -123,6 +125,22 @@ class _DailyReportScreenState extends State<DailyReportScreen> {
               ? Center(child: Text(_error!))
               : ListView(
                   children: [
+                    FilledButton.icon(
+                      icon: const Icon(Icons.open_in_new),
+                      label: const Text("عرض التقرير الكامل (الويب)"),
+                      style: FilledButton.styleFrom(
+                          minimumSize: const Size.fromHeight(52)),
+                      onPressed: () {
+                        final d = _date;
+                        final dateStr =
+                            "${d.year.toString().padLeft(4, "0")}-${d.month.toString().padLeft(2, "0")}-${d.day.toString().padLeft(2, "0")}";
+                        launchUrl(
+                          Uri.parse("$kApiBaseUrl/report/?date=$dateStr"),
+                          mode: LaunchMode.externalApplication,
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(

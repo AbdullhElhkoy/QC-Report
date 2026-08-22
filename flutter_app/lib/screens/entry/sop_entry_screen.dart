@@ -119,10 +119,10 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
               ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.task_alt, size: 64, color: Colors.green),
-                      const SizedBox(height: 12),
-                      const Text("الورديات الثلاثة اتسجلت بالفعل اليوم."),
+                    children: const [
+                      Icon(Icons.task_alt, size: 64, color: Colors.green),
+                      SizedBox(height: 12),
+                      Text("الورديات الثلاثة اتسجلت بالفعل اليوم."),
                     ],
                   ),
                 )
