@@ -276,6 +276,33 @@ class GCCLineItem(models.Model):
         return f"{self.shift_entry} - {self.get_package_type_display()}"
 
 
+SOP_BULK_UNITS = {"SOP_A", "SOP_B", "SOP_C", "SOP_D"}
+
+
+class BulkLog(models.Model):
+    shift_entry = models.OneToOneField(
+        ShiftEntry, on_delete=models.CASCADE, related_name="bulk_log"
+    )
+    exp_trucks = models.PositiveIntegerField("EXP trucks", null=True, blank=True)
+    dom_trucks = models.PositiveIntegerField("DOM trucks", null=True, blank=True)
+    std_trucks = models.PositiveIntegerField("STD trucks", null=True, blank=True)
+    nc_trucks = models.PositiveIntegerField("NC trucks", null=True, blank=True)
+
+    class Meta:
+        verbose_name = "BULK trucks log"
+
+    @property
+    def total_trucks(self):
+        return sum(
+            v
+            for v in (self.exp_trucks, self.dom_trucks, self.std_trucks, self.nc_trucks)
+            if v
+        )
+
+    def __str__(self):
+        return f"BULK - {self.shift_entry}"
+
+
 class LoadingLineItem(models.Model):
     shift_entry = models.ForeignKey(
         ShiftEntry, on_delete=models.CASCADE, related_name="loading_line_items"

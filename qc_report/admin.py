@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 from .models import (
+    BulkLog,
     DCPColorGrading,
     DCPRework,
     DCPSummary,
@@ -44,6 +45,12 @@ class UserAdmin(admin.ModelAdmin):
 class SOPLineItemInline(admin.TabularInline):
     model = SOPLineItem
     extra = 0
+
+
+class BulkLogInline(admin.StackedInline):
+    model = BulkLog
+    extra = 0
+    max_num = 1
 
 
 class DCPSummaryInline(admin.StackedInline):
@@ -103,7 +110,10 @@ class ShiftEntryAdmin(admin.ModelAdmin):
             return []
         unit = obj.unit
         if unit in ("SOP_A", "SOP_B", "SOP_C", "SOP_D", "G_SOP", "C_PACKING"):
-            return [SOPLineItemInline]
+            inlines = [SOPLineItemInline]
+            if unit in ("SOP_A", "SOP_B", "SOP_C", "SOP_D"):
+                inlines.append(BulkLogInline)
+            return inlines
         if unit == "DCP":
             return [
                 DCPSummaryInline,

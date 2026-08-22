@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.db.models import Count, Q, Sum
 
 from .models import (
+    BulkLog,
     ColorGradingCategory,
     DCPColorGrading,
     DCPRework,
@@ -95,11 +96,37 @@ def sop_section(start, end=None):
         "dom": _pct(grand["dom"], grand_total),
         "exp": _pct(grand["exp"], grand_total),
     }
+    # عربيات BULK: العدد من BulkLog والوزن من بنود BULK نفسها
+    bulk_units = [u for u in SOP_UNITS if "BULK" in SOP_PRODUCT_TYPES.get(u, [])]
+    bulk_entries = entries.filter(unit__in=bulk_units)
+    bulk_counts = BulkLog.objects.filter(shift_entry__in=bulk_entries).aggregate(
+        exp=Sum("exp_trucks"),
+        dom=Sum("dom_trucks"),
+        std=Sum("std_trucks"),
+        nc=Sum("nc_trucks"),
+    )
+    bulk_weights = SOPLineItem.objects.filter(
+        shift_entry__in=bulk_entries, product_type=ProductType.BULK
+    ).aggregate(exp=Sum("exp"), dom=Sum("dom"), std=Sum("std"), nc=Sum("nc"))
+    bulk = {
+        "counts": {k: v or 0 for k, v in bulk_counts.items()},
+        "weights": {
+            k: v if v is not None else ZERO for k, v in bulk_weights.items()
+        },
+    }
+    bulk["count_total"] = sum(bulk["counts"].values())
+    bulk["weight_total"] = (
+        bulk["weights"]["exp"]
+        + bulk["weights"]["dom"]
+        + bulk["weights"]["std"]
+        + bulk["weights"]["nc"]
+    )
     return {
         "rows": rows,
         "percentages": percentages,
         "grand": grand,
         "grand_total": grand_total,
+        "bulk": bulk,
     }
 
 

@@ -78,6 +78,34 @@
       </div>
     </div>
   </div>
+  <div class="col-12 col-md-6">
+    <div class="card">
+      <div class="card-header">BULK Trucks</div>
+      <div class="card-body p-0">
+        <table class="table table-bordered text-center align-middle mb-0">
+          <thead class="table-light">
+            <tr><th></th><th>EXP</th><th>DOM</th><th>STD</th><th>NC</th><th>Total</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th class="table-light">Count</th>
+              <td>{{ sop.bulk.counts.exp }}</td><td>{{ sop.bulk.counts.dom }}</td>
+              <td>{{ sop.bulk.counts.std }}</td><td>{{ sop.bulk.counts.nc }}</td>
+              <td class="fw-bold">{{ sop.bulk.count_total }}</td>
+            </tr>
+            <tr>
+              <th class="table-light">Weight</th>
+              <td>{{ sop.bulk.weights.exp|floatformat:2 }}</td>
+              <td>{{ sop.bulk.weights.dom|floatformat:2 }}</td>
+              <td>{{ sop.bulk.weights.std|floatformat:2 }}</td>
+              <td>{{ sop.bulk.weights.nc|floatformat:2 }}</td>
+              <td class="fw-bold">{{ sop.bulk.weight_total|floatformat:2 }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <h5>DCP</h5>

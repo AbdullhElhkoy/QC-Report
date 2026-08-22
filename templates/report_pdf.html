@@ -165,6 +165,35 @@
     </tbody>
 </table>
 
+<table>
+    <thead>
+        <tr class="th-blue">
+            <th colspan="6">BULK Trucks</th>
+        </tr>
+        <tr class="th-blue">
+            <th></th><th>EXP</th><th>DOM</th><th>STD</th><th>NC</th><th>Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="th-grey">Count</td>
+            <td>{{ sop.bulk.counts.exp }}</td>
+            <td>{{ sop.bulk.counts.dom }}</td>
+            <td>{{ sop.bulk.counts.std }}</td>
+            <td>{{ sop.bulk.counts.nc }}</td>
+            <td>{{ sop.bulk.count_total }}</td>
+        </tr>
+        <tr>
+            <td class="th-grey">Weight</td>
+            <td>{{ sop.bulk.weights.exp|floatformat:2 }}</td>
+            <td>{{ sop.bulk.weights.dom|floatformat:2 }}</td>
+            <td>{{ sop.bulk.weights.std|floatformat:2 }}</td>
+            <td>{{ sop.bulk.weights.nc|floatformat:2 }}</td>
+            <td>{{ sop.bulk.weight_total|floatformat:2 }}</td>
+        </tr>
+    </tbody>
+</table>
+
 <!-- ============ DCP ============ -->
 <table>
     <thead>

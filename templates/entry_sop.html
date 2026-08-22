@@ -73,8 +73,92 @@
       {% endfor %}
     {% endfor %}
 
+    {% if has_bulk and bulk_form %}
+      <h6 class="mt-4 mb-2">عربيات BULK</h6>
+      <div class="table-responsive" style="max-width: 560px;">
+        <table class="table table-bordered text-center align-middle bg-white mb-1" id="bulkTable">
+          <thead class="table-light">
+            <tr>
+              <th></th><th>EXP</th><th>DOM</th><th>STD</th><th>NC</th><th>TOTAL</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th class="table-light">العدد (عربيات)</th>
+              <td>{{ bulk_form.exp_trucks }}</td>
+              <td>{{ bulk_form.dom_trucks }}</td>
+              <td>{{ bulk_form.std_trucks }}</td>
+              <td>{{ bulk_form.nc_trucks }}</td>
+              <td class="fw-bold" id="bulkCountTotal">0</td>
+            </tr>
+            <tr>
+              <th class="table-light">الوزن (من الجدول فوق)</th>
+              <td id="bulkW-exp">0.00</td>
+              <td id="bulkW-dom">0.00</td>
+              <td id="bulkW-std">0.00</td>
+              <td id="bulkW-nc">0.00</td>
+              <td class="fw-bold" id="bulkWeightTotal">0.00</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+
     <button type="submit" class="btn btn-primary btn-lg mt-3">حفظ</button>
     <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary mt-3">إلغاء</a>
   </div>
 </form>
+{% endblock %}
+
+{% block extra_scripts %}
+{% if has_bulk %}
+<script>
+(function () {
+  var grid = document.querySelector("table.excel-grid tbody");
+  if (!grid) return;
+  var bulkRow = null;
+  grid.querySelectorAll("tr").forEach(function (tr) {
+    var th = tr.querySelector("th");
+    if (th && th.textContent.trim() === "BULK") bulkRow = tr;
+  });
+  if (!bulkRow) return;
+
+  // خانات BULK الرقمية بالترتيب: EXP DOM STD NC
+  var weightInputs = Array.prototype.slice.call(
+    bulkRow.querySelectorAll('input[type="number"]')
+  ).slice(0, 4);
+  var cols = ["exp", "dom", "std", "nc"];
+
+  function num(el) {
+    var v = parseFloat(el.value);
+    return isNaN(v) ? 0 : v;
+  }
+
+  function updateWeights() {
+    var total = 0;
+    cols.forEach(function (col, i) {
+      var v = num(weightInputs[i]);
+      total += v;
+      document.getElementById("bulkW-" + col).textContent = v.toFixed(2);
+    });
+    document.getElementById("bulkWeightTotal").textContent = total.toFixed(2);
+  }
+
+  function updateCounts() {
+    var inputs = document.querySelectorAll(".bulk-count");
+    var total = 0;
+    inputs.forEach(function (inp) { total += num(inp); });
+    document.getElementById("bulkCountTotal").textContent = total;
+  }
+
+  weightInputs.forEach(function (inp) { inp.addEventListener("input", updateWeights); });
+  document.querySelectorAll(".bulk-count").forEach(function (inp) {
+    inp.addEventListener("input", updateCounts);
+  });
+
+  updateWeights();
+  updateCounts();
+})();
+</script>
+{% endif %}
 {% endblock %}

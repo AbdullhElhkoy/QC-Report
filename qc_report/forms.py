@@ -1,6 +1,7 @@
 ﻿from django import forms
 
 from .models import (
+    BulkLog,
     DCPColorGrading,
     DCPRework,
     DCPSummary,
@@ -70,6 +71,18 @@ class SOPLineItemForm(ZeroDefaultMixin, forms.ModelForm):
             ),
             "cause": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
             "note": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+        }
+
+
+class BulkLogForm(forms.ModelForm):
+    class Meta:
+        model = BulkLog
+        fields = ["exp_trucks", "dom_trucks", "std_trucks", "nc_trucks"]
+        widgets = {
+            f: forms.NumberInput(
+                attrs={"class": "form-control form-control-sm bulk-count", "min": 0, "data-col": f.replace("_trucks", "")}
+            )
+            for f in ("exp_trucks", "dom_trucks", "std_trucks", "nc_trucks")
         }
 
 

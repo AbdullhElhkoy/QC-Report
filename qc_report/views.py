@@ -15,6 +15,7 @@ from django.utils import timezone
 from .aggregations import full_daily_report
 from .pdf_charts import generate_report_charts
 from .forms import (
+    BulkLogForm,
     DCPColorGradingForm,
     DCPReworkForm,
     DCPSummaryForm,
@@ -28,6 +29,7 @@ from .forms import (
     SOPLineItemForm,
 )
 from .models import (
+    BulkLog,
     ColorGradingCategory,
     DCPColorGrading,
     DCPRework,
@@ -44,6 +46,7 @@ from .models import (
     Shift,
     ShiftEntry,
     SOPLineItem,
+    SOP_BULK_UNITS,
     SOP_PRODUCT_TYPES,
     Unit,
 )
@@ -62,6 +65,7 @@ MODEL_TITLES = {
     "SALineItem": "بنود SA",
     "GCCLineItem": "بنود GCC",
     "LoadingLineItem": "بنود التحميل",
+    "BulkLog": "عربيات BULK",
 }
 
 # تسلسل الورديات المتكرر خلال اليوم: أول إدخال = الأولى، تاني = الثانية، تالت = الثالثة
@@ -299,9 +303,13 @@ def _build_all_forms(unit, data=None, entry=None):
         "dcp": None,
         "pa_form": None,
         "sa_form": None,
+        "bulk_form": None,
     }
     if unit in SOP_UNIT_TEMPLATES:
         ctx["rows"] = build_sop_rows(unit, data, entry)
+        if unit in SOP_BULK_UNITS:
+            instance = getattr(entry, "bulk_log", None) if entry is not None else None
+            ctx["bulk_form"] = BulkLogForm(data, instance=instance, prefix="bulk")
     elif unit in ("GCC1", "GCC2"):
         ctx["rows"] = build_gcc_rows(data, entry)
     elif unit == "LOADING":
@@ -320,6 +328,8 @@ def _build_all_forms(unit, data=None, entry=None):
 def _flatten_forms(ctx):
     forms = [ctx["shift_form"]]
     forms.extend(r["form"] for r in ctx["rows"])
+    if ctx.get("bulk_form"):
+        forms.append(ctx["bulk_form"])
     if ctx["dcp"]:
         d = ctx["dcp"]
         forms.append(d["summary"])
@@ -338,6 +348,14 @@ def _save_related(entry, data):
     unit = entry.unit
     if unit in SOP_UNIT_TEMPLATES:
         save_sop_rows(entry, data)
+        if unit in SOP_BULK_UNITS:
+            form = BulkLogForm(
+                data, instance=getattr(entry, "bulk_log", None), prefix="bulk"
+            )
+            if form.is_valid():
+                obj = form.save(commit=False)
+                obj.shift_entry = entry
+                obj.save()
     elif unit in ("GCC1", "GCC2"):
         save_gcc_rows(entry, data)
     elif unit == "LOADING":
@@ -417,6 +435,7 @@ def entry_new(request, unit):
             "today": today,
             "entries_today": entries_today,
             "existing_shifts": existing_shifts,
+            "has_bulk": unit in SOP_BULK_UNITS,
             **header_context(request, unit),
             **ctx,
         },
@@ -459,6 +478,7 @@ def entry_edit(request, unit, entry_date, shift):
             "editing": True,
             "entry": entry,
             "today": timezone.localdate(),
+            "has_bulk": unit in SOP_BULK_UNITS,
             **header_context(request, unit, entry=entry),
             **ctx,
         },
