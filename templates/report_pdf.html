@@ -149,18 +149,28 @@
 <table>
     <thead>
         <tr class="th-blue">
-            <th colspan="4">SOP UNIT %</th>
+            <th colspan="6">SOP UNIT %</th>
         </tr>
         <tr class="th-blue">
-            <th>NC</th><th>STD</th><th>DOM</th><th>EXP</th>
+            <th></th><th>EXP</th><th>DOM</th><th>STD</th><th>NC</th><th>Total</th>
         </tr>
     </thead>
     <tbody>
         <tr>
-            <td class="cell-nc">{{ sop.grand.nc }}</td>
-            <td>{{ sop.grand.std }}</td>
-            <td>{{ sop.grand.dom }}</td>
-            <td>{{ sop.grand.exp }}</td>
+            <td class="th-grey">Value</td>
+            <td>{{ sop.unit_pct.values.exp|floatformat:2 }}</td>
+            <td>{{ sop.unit_pct.values.dom|floatformat:2 }}</td>
+            <td>{{ sop.unit_pct.values.std|floatformat:2 }}</td>
+            <td>{{ sop.unit_pct.values.nc|floatformat:2 }}</td>
+            <td>{{ sop.unit_pct.value_total|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td class="th-grey">%</td>
+            <td>{{ sop.unit_pct.percents.exp|floatformat:2 }}%</td>
+            <td>{{ sop.unit_pct.percents.dom|floatformat:2 }}%</td>
+            <td>{{ sop.unit_pct.percents.std|floatformat:2 }}%</td>
+            <td>{{ sop.unit_pct.percents.nc|floatformat:2 }}%</td>
+            <td>{{ sop.unit_pct.percent_total }}%</td>
         </tr>
     </tbody>
 </table>

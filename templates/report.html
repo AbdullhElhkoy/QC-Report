@@ -68,13 +68,30 @@
   <div class="col-12 col-md-6">
     <div class="card">
       <div class="card-header">SOP UNIT %</div>
-      <div class="card-body">
-        <div class="row text-center">
-          <div class="col-3"><strong>NC%</strong><br>{{ sop.percentages.nc|floatformat:2 }}</div>
-          <div class="col-3"><strong>STD%</strong><br>{{ sop.percentages.std|floatformat:2 }}</div>
-          <div class="col-3"><strong>DOM%</strong><br>{{ sop.percentages.dom|floatformat:2 }}</div>
-          <div class="col-3"><strong>EXP%</strong><br>{{ sop.percentages.exp|floatformat:2 }}</div>
-        </div>
+      <div class="card-body p-0">
+        <table class="table table-bordered text-center align-middle mb-0">
+          <thead class="table-light">
+            <tr><th></th><th>EXP</th><th>DOM</th><th>STD</th><th>NC</th><th>Total</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th class="table-light">Value</th>
+              <td>{{ sop.unit_pct.values.exp|floatformat:2 }}</td>
+              <td>{{ sop.unit_pct.values.dom|floatformat:2 }}</td>
+              <td>{{ sop.unit_pct.values.std|floatformat:2 }}</td>
+              <td>{{ sop.unit_pct.values.nc|floatformat:2 }}</td>
+              <td class="fw-bold">{{ sop.unit_pct.value_total|floatformat:2 }}</td>
+            </tr>
+            <tr>
+              <th class="table-light">%</th>
+              <td>{{ sop.unit_pct.percents.exp|floatformat:2 }}%</td>
+              <td>{{ sop.unit_pct.percents.dom|floatformat:2 }}%</td>
+              <td>{{ sop.unit_pct.percents.std|floatformat:2 }}%</td>
+              <td>{{ sop.unit_pct.percents.nc|floatformat:2 }}%</td>
+              <td class="fw-bold">{{ sop.unit_pct.percent_total }}%</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>

@@ -45,7 +45,6 @@ def sop_section(start, end=None):
     )
     items = SOPLineItem.objects.filter(shift_entry__in=entries)
     rows = []
-    grand = {"exp": ZERO, "dom": ZERO, "std": ZERO, "nc": ZERO}
     for unit in SOP_UNITS:
         unit_items = [i for i in items if i.shift_entry.unit == unit]
         product_rows = []
@@ -76,11 +75,6 @@ def sop_section(start, end=None):
                     "texts": " & ".join(texts),
                 }
             )
-            if unit != Unit.C_PACKING:
-                grand["exp"] += exp
-                grand["dom"] += dom
-                grand["std"] += std
-                grand["nc"] += nc
         rows.append(
             {
                 "unit": unit,
@@ -89,12 +83,23 @@ def sop_section(start, end=None):
                 "total": unit_total,
             }
         )
-    grand_total = grand["exp"] + grand["dom"] + grand["std"]
-    percentages = {
-        "nc": _pct(grand["nc"], grand_total),
-        "std": _pct(grand["std"], grand_total),
-        "dom": _pct(grand["dom"], grand_total),
-        "exp": _pct(grand["exp"], grand_total),
+    # SOP UNIT %: تجميع قيم وحدات SOP_A حتى SOP_D فقط + النسبة من الإجمالي
+    abcd_units = ["SOP_A", "SOP_B", "SOP_C", "SOP_D"]
+    abcd = {"exp": ZERO, "dom": ZERO, "std": ZERO, "nc": ZERO}
+    for i in items:
+        if i.shift_entry.unit in abcd_units:
+            abcd["exp"] += i.exp
+            abcd["dom"] += i.dom
+            abcd["std"] += i.std
+            abcd["nc"] += i.nc
+    value_total = sum(abcd.values())
+    unit_pct = {
+        "values": abcd,
+        "value_total": value_total,
+        "percents": {
+            k: _pct(v, value_total) for k, v in abcd.items()
+        },
+        "percent_total": Decimal("100"),
     }
     # عربيات BULK: العدد من BulkLog والوزن من بنود BULK نفسها
     bulk_units = [u for u in SOP_UNITS if "BULK" in SOP_PRODUCT_TYPES.get(u, [])]
@@ -123,9 +128,7 @@ def sop_section(start, end=None):
     )
     return {
         "rows": rows,
-        "percentages": percentages,
-        "grand": grand,
-        "grand_total": grand_total,
+        "unit_pct": unit_pct,
         "bulk": bulk,
     }
 
