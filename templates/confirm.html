@@ -30,46 +30,14 @@
       <p><strong>إجمالي الوحدة:</strong> {{ sop_total }}</p>
     {% endif %}
 
-    {% if dcp_summary %}
-      <h6>ملخص DCP</h6>
+    {% if dcp_bb %}
+      <h6>DCP</h6>
       <ul class="list-inline">
-        <li class="list-inline-item me-3">B.B: {{ dcp_summary.bb_total }}</li>
-        <li class="list-inline-item me-3">AS S.B: {{ dcp_summary.as_sb_total }}</li>
-        <li class="list-inline-item me-3">TOTAL 1: {{ dcp_summary.total_1 }}</li>
-        <li class="list-inline-item me-3">TOTAL 2: {{ dcp_summary.total_2 }}</li>
-        <li class="list-inline-item me-3">اختبار معمل: {{ dcp_summary.lab_test_count }}</li>
-        <li class="list-inline-item me-3">اختبار امس: {{ dcp_summary.yesterday_test_count }}</li>
+        <li class="list-inline-item me-3">TOTAL EXP: {{ dcp_bb.green|add:dcp_bb.yellow|add:dcp_bb.green_yellow|add:dcp_bb.blue }}</li>
+        <li class="list-inline-item me-3">TOTAL DOM: {{ dcp_bb.white }}</li>
+        <li class="list-inline-item me-3">TOTAL NC: {{ dcp_bb.red }}</li>
+        {% if dcp_tests %}<li class="list-inline-item me-3">إجمالي الاختبار: {{ dcp_tests.total_tests }}</li>{% endif %}
       </ul>
-      <h6>تدرج الألوان</h6>
-      <table class="table table-bordered text-center align-middle">
-        <thead class="table-light">
-          <tr><th>الفئة</th><th>أخضر</th><th>أصفر</th><th>أخضر وأصفر</th><th>أزرق</th><th>أبيض</th><th>أحمر</th></tr>
-        </thead>
-        <tbody>
-          {% for g in gradings %}
-            <tr>
-              <td>{{ g.get_category_display }}</td>
-              <td>{{ g.green }}</td><td>{{ g.yellow }}</td><td>{{ g.green_yellow }}</td>
-              <td>{{ g.blue }}</td><td>{{ g.white }}</td><td>{{ g.red }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% if under_test %}<p><strong>تحت الاختبار:</strong> {{ under_test.quantity }}</p>{% endif %}
-      {% if white_quality %}
-        <p>
-          <strong>جودة الأبيض:</strong>
-          IM {{ white_quality.im }} — Over {{ white_quality.over }} — Color {{ white_quality.color }}
-          — P2O5 {{ white_quality.p2o5 }} — MC {{ white_quality.mc }} — NC {{ white_quality.nc_count }}
-        </p>
-      {% endif %}
-      {% if rework %}
-        <p>
-          <strong>التدوير:</strong>
-          اجمالي {{ rework.total }} — أخضر وأصفر {{ rework.green_yellow }} —
-          أصفر {{ rework.yellow }} — أخضر {{ rework.green }}
-        </p>
-      {% endif %}
     {% endif %}
 
     {% if pa_items %}

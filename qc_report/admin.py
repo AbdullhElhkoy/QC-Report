@@ -2,11 +2,11 @@ from django.contrib import admin
 
 from .models import (
     BulkLog,
-    DCPColorGrading,
-    DCPRework,
-    DCPSummary,
-    DCPUnderTest,
-    DCPWhiteQuality,
+    DCPASRow,
+    DCPBBRow,
+    DCPReason,
+    DCPTests,
+    DCPSBRow,
     GCCLineItem,
     LoadingLineItem,
     PALineItem,
@@ -53,29 +53,35 @@ class BulkLogInline(admin.StackedInline):
     max_num = 1
 
 
-class DCPSummaryInline(admin.StackedInline):
-    model = DCPSummary
+class DCPBBRowInline(admin.StackedInline):
+    model = DCPBBRow
     extra = 0
+    max_num = 1
 
 
-class DCPColorGradingInline(admin.TabularInline):
-    model = DCPColorGrading
+class DCPSBRowInline(admin.StackedInline):
+    model = DCPSBRow
     extra = 0
+    max_num = 1
 
 
-class DCPUnderTestInline(admin.StackedInline):
-    model = DCPUnderTest
+class DCPASRowInline(admin.StackedInline):
+    model = DCPASRow
     extra = 0
+    max_num = 1
 
 
-class DCPWhiteQualityInline(admin.StackedInline):
-    model = DCPWhiteQuality
+class DCPTestsInline(admin.StackedInline):
+    model = DCPTests
     extra = 0
+    max_num = 1
 
 
-class DCPReworkInline(admin.StackedInline):
-    model = DCPRework
-    extra = 0
+@admin.register(DCPReason)
+class DCPReasonAdmin(admin.ModelAdmin):
+    list_display = ("name", "category", "order", "is_active")
+    list_filter = ("category", "is_active")
+    list_editable = ("order", "is_active")
 
 
 class PALineItemInline(admin.TabularInline):
@@ -116,11 +122,10 @@ class ShiftEntryAdmin(admin.ModelAdmin):
             return inlines
         if unit == "DCP":
             return [
-                DCPSummaryInline,
-                DCPColorGradingInline,
-                DCPUnderTestInline,
-                DCPWhiteQualityInline,
-                DCPReworkInline,
+                DCPBBRowInline,
+                DCPSBRowInline,
+                DCPASRowInline,
+                DCPTestsInline,
             ]
         if unit == "PA":
             return [PALineItemInline]

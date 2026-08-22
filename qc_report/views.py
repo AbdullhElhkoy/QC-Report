@@ -16,11 +16,12 @@ from .aggregations import full_daily_report
 from .pdf_charts import generate_report_charts
 from .forms import (
     BulkLogForm,
-    DCPColorGradingForm,
-    DCPReworkForm,
-    DCPSummaryForm,
-    DCPUnderTestForm,
-    DCPWhiteQualityForm,
+    DCPASRowForm,
+    DCPBBRowForm,
+    DCPReasonLineForm,
+    DCPTestsForm,
+    DCPSBRowForm,
+    build_dcp_reason_line_form,
     GCCLineItemForm,
     LoadingLineItemForm,
     PALineItemForm,
@@ -30,12 +31,13 @@ from .forms import (
 )
 from .models import (
     BulkLog,
-    ColorGradingCategory,
-    DCPColorGrading,
-    DCPRework,
-    DCPSummary,
-    DCPUnderTest,
-    DCPWhiteQuality,
+    DCPASRow,
+    DCPBBRow,
+    DCPReason,
+    DCPReasonCategory,
+    DCPReasonLine,
+    DCPTests,
+    DCPSBRow,
     GCCLineItem,
     LoadingLineItem,
     LoadingProductType,
@@ -66,6 +68,11 @@ MODEL_TITLES = {
     "GCCLineItem": "بنود GCC",
     "LoadingLineItem": "بنود التحميل",
     "BulkLog": "عربيات BULK",
+    "DCPBBRow": "جدول B.B",
+    "DCPSBRow": "جدول S.B",
+    "DCPASRow": "جدول S.B AS",
+    "DCPTests": "الاختبارات",
+    "DCPReasonLine": "أسباب الأبيض والأحمر",
 }
 
 # تسلسل الورديات المتكرر خلال اليوم: أول إدخال = الأولى، تاني = الثانية، تالت = الثالثة
@@ -195,68 +202,100 @@ def save_loading_rows(entry, data):
             obj.save()
 
 
+def dcp_reason_context(entry, category):
+    """خيارات القائمة المنسدلة + القيم المحفوظة (سببين كحد أقصى)."""
+    qs = DCPReason.objects.filter(category=category, is_active=True).order_by(
+        "order", "id"
+    )
+    saved = []
+    if entry is not None:
+        saved = list(
+            entry.dcp_reason_lines.filter(reason__category=category).order_by("id")
+        )
+    pairs = []
+    for i in range(2):
+        line = saved[i] if i < len(saved) else None
+        pairs.append(
+            {
+                "reason_id": line.reason_id if line else None,
+                "qty": line.qty if line else None,
+            }
+        )
+    return {"options": qs, "pairs": pairs}
+
+
 def build_dcp_forms(data=None, entry=None):
     def single(form_class, related_name, prefix):
         instance = getattr(entry, related_name, None) if entry is not None else None
         return form_class(data, instance=instance, prefix=prefix)
 
-    grading_rows = []
-    for cat in ColorGradingCategory:
-        instance = None
-        if entry is not None:
-            instance = entry.dcp_color_gradings.filter(category=cat).first()
-        grading_rows.append(
-            {
-                "form": DCPColorGradingForm(data, instance=instance, prefix=f"grade_{cat}"),
-                "label": ColorGradingCategory(cat).label,
-            }
-        )
     return {
-        "summary": single(DCPSummaryForm, "dcp_summary", "summary"),
-        "grading_rows": grading_rows,
-        "under_test": single(DCPUnderTestForm, "dcp_under_test", "under_test"),
-        "white_quality": single(DCPWhiteQualityForm, "dcp_white_quality", "white_quality"),
-        "rework": single(DCPReworkForm, "dcp_rework", "rework"),
+        "bb": single(DCPBBRowForm, "dcp_bb", "bb"),
+        "sb": single(DCPSBRowForm, "dcp_sb", "sb"),
+        "as_row": single(DCPASRowForm, "dcp_as", "as"),
+        "tests": single(DCPTestsForm, "dcp_tests", "tests"),
+        "white": dcp_reason_context(entry, DCPReasonCategory.WHITE),
+        "nc": dcp_reason_context(entry, DCPReasonCategory.NC),
     }
 
 
 def save_dcp_forms(entry, data):
-    summary = DCPSummaryForm(
-        data, instance=getattr(entry, "dcp_summary", None), prefix="summary"
-    )
-    if summary.is_valid():
-        obj = summary.save(commit=False)
+    """حفظ جداول DCP مع التحقق: مجموع أسباب الأبيض = White ومجموع الأحمر = Red."""
+    from django.core.exceptions import ValidationError
+
+    def single(form_class, related_name, prefix):
+        form = form_class(data, instance=getattr(entry, related_name, None), prefix=prefix)
+        if not form.is_valid():
+            return None
+        obj = form.save(commit=False)
         obj.shift_entry = entry
         obj.save()
-    for cat in ColorGradingCategory:
-        existing = entry.dcp_color_gradings.filter(category=cat).first()
-        form = DCPColorGradingForm(data, instance=existing, prefix=f"grade_{cat}")
-        if form.is_valid():
-            obj = form.save(commit=False)
-            obj.shift_entry = entry
-            obj.category = cat
-            obj.save()
-    under_test = DCPUnderTestForm(
-        data, instance=getattr(entry, "dcp_under_test", None), prefix="under_test"
-    )
-    if under_test.is_valid():
-        obj = under_test.save(commit=False)
-        obj.shift_entry = entry
-        obj.save()
-    white_quality = DCPWhiteQualityForm(
-        data, instance=getattr(entry, "dcp_white_quality", None), prefix="white_quality"
-    )
-    if white_quality.is_valid():
-        obj = white_quality.save(commit=False)
-        obj.shift_entry = entry
-        obj.save()
-    rework = DCPReworkForm(
-        data, instance=getattr(entry, "dcp_rework", None), prefix="rework"
-    )
-    if rework.is_valid():
-        obj = rework.save(commit=False)
-        obj.shift_entry = entry
-        obj.save()
+        return obj
+
+    bb = single(DCPBBRowForm, "dcp_bb", "bb")
+    sb = single(DCPSBRowForm, "dcp_sb", "sb")
+    as_row = single(DCPASRowForm, "dcp_as", "as")
+    tests = single(DCPTestsForm, "dcp_tests", "tests")
+    if bb is None or sb is None or as_row is None or tests is None:
+        raise ValidationError("بيانات DCP غير مكتملة.")
+
+    def collect_lines(prefix, category):
+        lines, total = [], 0
+        for i in (1, 2):
+            raw_r = data.get(f"{prefix}_reason_{i}")
+            raw_q = data.get(f"{prefix}_qty_{i}")
+            if not raw_r:
+                continue
+            try:
+                qty = int(raw_q or 0)
+            except ValueError:
+                qty = 0
+            reason = DCPReason.objects.filter(pk=raw_r, category=category).first()
+            if reason and qty > 0:
+                lines.append(DCPReasonLine(shift_entry=entry, reason=reason, qty=qty))
+                total += qty
+        return lines, total
+
+    white_lines, white_total = collect_lines("w", DCPReasonCategory.WHITE)
+    nc_lines, nc_total = collect_lines("n", DCPReasonCategory.NC)
+
+    # منع تكرار نفس السبب مرتين في نفس الجدول
+    w_ids = [l.reason_id for l in white_lines]
+    n_ids = [l.reason_id for l in nc_lines]
+    if len(w_ids) != len(set(w_ids)) or len(n_ids) != len(set(n_ids)):
+        raise ValidationError("لا يمكن اختيار نفس السبب مرتين في نفس الجدول.")
+
+    entry.dcp_reason_lines.all().delete()
+    DCPReasonLine.objects.bulk_create(white_lines + nc_lines)
+
+    if white_total != bb.white:
+        raise ValidationError(
+            f"مجموع أسباب الأبيض ({white_total}) لا يساوي عدد الأبيض في جدول B.B ({bb.white})."
+        )
+    if nc_total != bb.red:
+        raise ValidationError(
+            f"مجموع أسباب الأحمر ({nc_total}) لا يساوي عدد الأحمر في جدول B.B ({bb.red})."
+        )
 
 
 def all_row_forms_valid(forms_iterable):
@@ -332,11 +371,10 @@ def _flatten_forms(ctx):
         forms.append(ctx["bulk_form"])
     if ctx["dcp"]:
         d = ctx["dcp"]
-        forms.append(d["summary"])
-        forms.extend(r["form"] for r in d["grading_rows"])
-        forms.append(d["under_test"])
-        forms.append(d["white_quality"])
-        forms.append(d["rework"])
+        forms.append(d["bb"])
+        forms.append(d["sb"])
+        forms.append(d["as_row"])
+        forms.append(d["tests"])
     if ctx["pa_form"]:
         forms.append(ctx["pa_form"])
     if ctx["sa_form"]:
@@ -415,12 +453,16 @@ def entry_new(request, unit):
                     entry.save()
                     _save_related(entry, request.POST)
                 return redirect("entry_done", unit=unit, pk=entry.pk)
-            except (IntegrityError, ValidationError):
+            except IntegrityError:
                 shift_form.add_error(
                     None,
                     "تم إدخال هذه الوردية بالفعل لهذا اليوم والوحدة. عدّل الإدخال الموجود.",
                 )
                 messages.warning(request, "هذا الإدخال موجود بالفعل.")
+            except ValidationError as ex:
+                msgs = list(getattr(ex, "messages", []) or [str(ex)])
+                for m in msgs:
+                    shift_form.add_error(None, m)
     else:
         ctx = _build_all_forms(unit)
 
@@ -461,11 +503,14 @@ def entry_edit(request, unit, entry_date, shift):
                     _save_related(entry, request.POST)
                 messages.success(request, "تم تعديل الإدخال بنجاح.")
                 return redirect("entry_done", unit=unit, pk=entry.pk)
-            except (IntegrityError, ValidationError):
+            except IntegrityError:
                 ctx["shift_form"].add_error(
                     None,
                     "يوجد إدخال آخر لنفس الوحدة والتاريخ والوردية.",
                 )
+            except ValidationError as ex:
+                for m in list(getattr(ex, "messages", []) or [str(ex)]):
+                    ctx["shift_form"].add_error(None, m)
     else:
         ctx = _build_all_forms(unit, entry=entry)
 
@@ -493,11 +538,16 @@ def entry_summary_context(entry):
         ctx["sop_items"] = items
         ctx["sop_total"] = sum((i.total for i in items), ZERO)
     elif unit == "DCP":
-        ctx["dcp_summary"] = getattr(entry, "dcp_summary", None)
-        ctx["gradings"] = entry.dcp_color_gradings.all()
-        ctx["under_test"] = getattr(entry, "dcp_under_test", None)
-        ctx["white_quality"] = getattr(entry, "dcp_white_quality", None)
-        ctx["rework"] = getattr(entry, "dcp_rework", None)
+        ctx["dcp_bb"] = getattr(entry, "dcp_bb", None)
+        ctx["dcp_sb"] = getattr(entry, "dcp_sb", None)
+        ctx["dcp_as"] = getattr(entry, "dcp_as", None)
+        ctx["dcp_tests"] = getattr(entry, "dcp_tests", None)
+        ctx["dcp_white_lines"] = entry.dcp_reason_lines.filter(
+            reason__category="WHITE"
+        ).select_related("reason")
+        ctx["dcp_nc_lines"] = entry.dcp_reason_lines.filter(
+            reason__category="NC"
+        ).select_related("reason")
     elif unit == "PA":
         ctx["pa_items"] = entry.pa_line_items.all()
     elif unit == "SA":

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-{% load static l10n %}
+{% load static l10n report_extras %}
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
@@ -208,20 +208,29 @@
 <table>
     <thead>
         <tr class="th-blue">
-            <th rowspan="2">DCP</th>
-            <th>B.B</th><th>AS S.B</th><th>TOTAL</th><th>TOTAL</th>
-            <th colspan="2">Lab Tests / Yesterday</th>
+            <th colspan="5">DCP Totals</th><th colspan="2">Tests</th>
+        </tr>
+        <tr class="th-blue">
+            <th>TOTAL EXP</th><th>TOTAL DOM</th><th>TOTAL NC</th><th>AS SB</th><th>Total</th>
+            <th>Today (S3)</th><th>Yesterday (S3)</th>
         </tr>
     </thead>
     <tbody>
         <tr>
-            <td class="th-blue">TOTAL</td>
-            <td>{{ dcp.summary.bb_total }}</td>
-            <td>{{ dcp.summary.as_sb_total }}</td>
-            <td>{{ dcp.summary.total_1 }}</td>
-            <td>{{ dcp.summary.total_2 }}</td>
-            <td>{{ dcp.summary.lab_test_count }}</td>
-            <td>{{ dcp.summary.yesterday_test_count }}</td>
+            <td>{{ dcp.totals.total_exp }}</td>
+            <td>{{ dcp.totals.total_dom }}</td>
+            <td class="cell-nc">{{ dcp.totals.total_nc }}</td>
+            <td>{{ dcp.totals.as_sb }}</td>
+            <td>{{ dcp.totals.total }}</td>
+            <td>{{ dcp.tests.today }}</td>
+            <td>{{ dcp.tests.yesterday }}</td>
+        </tr>
+        <tr>
+            <td colspan="3"></td>
+            <td class="th-grey">S.B</td>
+            <td>{{ dcp.totals.sb }}</td>
+            <td class="th-grey">TOTAL S.B</td>
+            <td>{{ dcp.totals.total_sb }}</td>
         </tr>
     </tbody>
 </table>
@@ -229,44 +238,76 @@
 <table>
     <thead>
         <tr class="th-blue">
-            <th>Total</th><th>Green</th><th>Yellow</th><th>G + Y</th>
+            <th>B.B — Shift</th><th>Green</th><th>Yellow</th><th>G + Y</th>
             <th>Blue</th><th>White</th><th>Red</th>
         </tr>
     </thead>
     <tbody>
-        {% for c in dcp.categories %}
+        {% for r in dcp.bb_rows %}
         <tr>
-            <td class="th-grey">{{ c.total }}</td>
-            <td>{{ c.green }}</td><td>{{ c.yellow }}</td><td>{{ c.green_yellow }}</td>
-            <td>{{ c.blue }}</td><td>{{ c.white }}</td>
-            <td class="cell-nc">{{ c.red }}</td>
+            <td class="th-grey">{{ r.shift|title }}</td>
+            <td>{{ r.green }}</td><td>{{ r.yellow }}</td><td>{{ r.green_yellow }}</td>
+            <td>{{ r.blue }}</td><td>{{ r.white }}</td>
+            <td class="cell-nc">{{ r.red }}</td>
         </tr>
         {% endfor %}
+        <tr style="background-color:#dce6f1;font-weight:bold;">
+            <td class="th-grey">Total</td>
+            <td>{{ dcp.bb_total.green }}</td><td>{{ dcp.bb_total.yellow }}</td><td>{{ dcp.bb_total.green_yellow }}</td>
+            <td>{{ dcp.bb_total.blue }}</td><td>{{ dcp.bb_total.white }}</td>
+            <td class="cell-nc">{{ dcp.bb_total.red }}</td>
+        </tr>
     </tbody>
 </table>
 
 <table>
     <thead>
-        <tr class="th-yellow">
-            <th>Under Test</th><th>DCP WHITE - IM</th><th>OVER</th><th>COLOR</th>
-            <th>P2O5</th><th>MC</th><th>NC</th><th>NOTES / REWORK</th>
+        <tr class="th-blue"><th colspan="4">S.B</th><th colspan="4">S.B AS</th></tr>
+        <tr class="th-blue">
+            <th>Shift</th><th>EXP</th><th>DOM</th><th>S.B White</th>
+            <th>Shift</th><th>EXP</th><th>DOM</th><th>S.B White</th>
         </tr>
     </thead>
     <tbody>
+        {% for s in dcp.sb_rows %}
         <tr>
-            <td>{{ dcp.under_test }}</td>
-            <td>{{ dcp.white_quality.im }}</td>
-            <td>{{ dcp.white_quality.over }}</td>
-            <td>{{ dcp.white_quality.color }}</td>
-            <td>{{ dcp.white_quality.p2o5 }}</td>
-            <td>{{ dcp.white_quality.mc }}</td>
-            <td class="cell-nc">{{ dcp.white_quality.nc_count }}</td>
-            <td>
-                Total: {{ dcp.rework.total }} —
-                Green &amp; Yellow: {{ dcp.rework.green_yellow }} —
-                Yellow: {{ dcp.rework.yellow }} —
-                Green: {{ dcp.rework.green }}
-            </td>
+            <td class="th-grey">{{ s.shift|title }}</td>
+            <td>{{ s.exp }}</td><td>{{ s.dom }}</td><td>{{ s.sb_white }}</td>
+            {% with a=dcp.as_rows|index:forloop.counter0 %}
+            <td class="th-grey">{{ a.shift|title }}</td>
+            <td>{{ a.exp }}</td><td>{{ a.dom }}</td><td>{{ a.sb_white }}</td>
+            {% endwith %}
+        </tr>
+        {% endfor %}
+        <tr style="background-color:#dce6f1;font-weight:bold;">
+            <td class="th-grey">Total</td>
+            <td>{{ dcp.sb_total.exp }}</td><td>{{ dcp.sb_total.dom }}</td><td>{{ dcp.sb_total.sb_white }}</td>
+            <td class="th-grey">Total</td>
+            <td>{{ dcp.as_total.exp }}</td><td>{{ dcp.as_total.dom }}</td><td>{{ dcp.as_total.sb_white }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<table>
+    <thead>
+        <tr class="th-yellow"><th colspan="2">DCP White — Reasons</th><th colspan="2">DCP NC — Reasons</th></tr>
+        <tr class="th-yellow"><th>Reason</th><th>Qty</th><th>Reason</th><th>Qty</th></tr>
+    </thead>
+    <tbody>
+        {% for wl in dcp.white_lines %}
+        <tr>
+            <td>{{ wl.name }}</td><td>{{ wl.qty }}</td>
+            {% with nl=dcp.nc_lines|index:forloop.counter0 %}
+            <td>{% if nl %}{{ nl.name }}{% endif %}</td>
+            <td>{% if nl %}{{ nl.qty }}{% endif %}</td>
+            {% endwith %}
+        </tr>
+        {% empty %}
+        <tr><td colspan="4" style="text-align:center;">—</td></tr>
+        {% endfor %}
+        <tr style="font-weight:bold;">
+            <td class="th-grey">Total</td><td>{{ dcp.bb_total.white }}</td>
+            <td class="th-grey">Total</td><td>{{ dcp.bb_total.red }}</td>
         </tr>
     </tbody>
 </table>

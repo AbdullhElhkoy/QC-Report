@@ -9,76 +9,253 @@
     {% csrf_token %}
     {% include "partials/shift_fields.html" %}
 
-    <h5 class="mt-4 mb-2">ملخص DCP</h5>
-    <div class="row g-3 excel-grid">
-      {% for field in dcp.summary %}
-        <div class="col-6 col-md-3">
-          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-          {{ field }}
-          <small class="text-danger d-block">{{ field.errors }}</small>
+    {# ===== الصف العلوي: الإجماليات + الاختبارات (جنب بعض) ===== #}
+    <div class="row g-3 mb-1">
+      <div class="col-12 col-lg-7">
+        <h6 class="mb-2">الإجماليات</h6>
+        <table class="table table-bordered text-center align-middle bg-white mb-0" id="dcpTotals">
+          <thead class="table-light">
+            <tr><th>TOTAL EXP</th><th>TOTAL DOM</th><th>TOTAL NC</th><th>AS SB</th><th>Total</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td id="t-exp">0</td>
+              <td id="t-dom">0</td>
+              <td id="t-nc">0</td>
+              <td id="t-as">0</td>
+              <td class="fw-bold" id="t-all">0</td>
+            </tr>
+            <tr>
+              <td colspan="3"></td>
+              <th class="table-light">S.B</th>
+              <td id="t-sb">0</td>
+            </tr>
+            <tr>
+              <td colspan="3"></td>
+              <th class="table-light">TOTAL S.B</th>
+              <td class="fw-bold" id="t-tsb">0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="col-12 col-lg-5">
+        <h6 class="mb-2">الاختبار</h6>
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label small mb-1">اختبار معمل</label>
+            {{ dcp.tests.lab_test }}
+          </div>
+          <div class="col-6">
+            <label class="form-label small mb-1">اختبار أرضية</label>
+            {{ dcp.tests.floor_test }}
+          </div>
+          <div class="col-12">
+            <table class="table table-bordered text-center align-middle bg-white mb-0">
+              <tbody>
+                <tr>
+                  <th class="table-light">إجمالي الاختبار</th>
+                  <td class="fw-bold" id="dcpTestTotal">0</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
-      {% endfor %}
+      </div>
     </div>
 
-    <h5 class="mt-4 mb-2">تدرج الألوان</h5>
+    {# ===== جدول B.B ===== #}
+    <h6 class="mt-3 mb-2">B.B</h6>
     <div class="table-responsive">
       <table class="table excel-grid align-middle text-center">
         <thead class="table-light">
           <tr>
-            <th>الفئة</th><th>أخضر</th><th>أصفر</th><th>أخضر وأصفر</th>
-            <th>أزرق</th><th>أبيض</th><th>أحمر</th>
+            <th>Green</th><th>Yellow</th><th>Green &amp; Yellow</th>
+            <th>Blue</th><th>White</th><th>Red</th><th>Note</th>
           </tr>
         </thead>
         <tbody>
-          {% for row in dcp.grading_rows %}
-            <tr>
-              <th class="table-light">{{ row.label }}</th>
-              <td>{{ row.form.green }}</td>
-              <td>{{ row.form.yellow }}</td>
-              <td>{{ row.form.green_yellow }}</td>
-              <td>{{ row.form.blue }}</td>
-              <td>{{ row.form.white }}</td>
-              <td>{{ row.form.red }}</td>
-            </tr>
-          {% endfor %}
+          <tr>
+            <td>{{ dcp.bb.green }}</td>
+            <td>{{ dcp.bb.yellow }}</td>
+            <td>{{ dcp.bb.green_yellow }}</td>
+            <td>{{ dcp.bb.blue }}</td>
+            <td>{{ dcp.bb.white }}</td>
+            <td>{{ dcp.bb.red }}</td>
+            <td>{{ dcp.bb.note }}</td>
+          </tr>
         </tbody>
       </table>
     </div>
 
-    <div class="row g-3 mt-1 excel-grid">
+    {# ===== S.B و S.B AS جنب بعض ===== #}
+    <div class="row g-3">
       <div class="col-12 col-md-6">
-        <h5 class="mb-2">تحت الاختبار / الأرضية المعمل</h5>
-        <label class="form-label" for="{{ dcp.under_test.quantity.id_for_label }}">الكمية</label>
-        {{ dcp.under_test.quantity }}
-        <small class="text-danger d-block">{{ dcp.under_test.quantity.errors }}</small>
+        <h6 class="mb-2">S.B</h6>
+        <table class="table excel-grid align-middle text-center">
+          <thead class="table-light">
+            <tr><th>EXP</th><th>DOM</th><th>S.B White</th><th>Note</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{{ dcp.sb.exp }}</td>
+              <td>{{ dcp.sb.dom }}</td>
+              <td>{{ dcp.sb.sb_white }}</td>
+              <td>{{ dcp.sb.note }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
       <div class="col-12 col-md-6">
-        <h5 class="mb-2">جودة الأبيض (قراءات معمل)</h5>
-        <div class="row g-2">
-          {% for field in dcp.white_quality %}
-            <div class="col-6 col-md-4">
-              <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-              {{ field }}
-              <small class="text-danger d-block">{{ field.errors }}</small>
-            </div>
-          {% endfor %}
-        </div>
+        <h6 class="mb-2">S.B AS</h6>
+        <table class="table excel-grid align-middle text-center">
+          <thead class="table-light">
+            <tr><th>EXP</th><th>DOM</th><th>S.B White</th><th>Note</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{{ dcp.as_row.exp }}</td>
+              <td>{{ dcp.as_row.dom }}</td>
+              <td>{{ dcp.as_row.sb_white }}</td>
+              <td>{{ dcp.as_row.note }}</td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
 
-    <h5 class="mt-4 mb-2">التدوير</h5>
-    <div class="row g-3 excel-grid">
-      {% for field in dcp.rework %}
-        <div class="col-6 col-md-3">
-          <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-          {{ field }}
-          <small class="text-danger d-block">{{ field.errors }}</small>
-        </div>
-      {% endfor %}
+    {# ===== DCP White و DCP NC تحت بعض بالعرض ===== #}
+    <div class="row g-3 mt-1">
+      <div class="col-12 col-lg-6">
+        <h6 class="mb-2">DCP White <small class="text-muted">(لازم يساوي الأبيض في B.B = <span id="bbWhiteEcho">{{ dcp.bb.white.value|default:0 }}</span>)</small></h6>
+        <table class="table excel-grid align-middle text-center" data-sum-target="whiteSum">
+          <thead class="table-light"><tr><th style="width:55%;">السبب</th><th>الرقم</th></tr></thead>
+          <tbody>
+            {% for pair in dcp.white.pairs %}
+              <tr>
+                <td>
+                  <select name="w_reason_{{ forloop.counter }}" class="form-select form-select-sm">
+                    <option value="">—</option>
+                    {% for r in dcp.white.options %}
+                      <option value="{{ r.pk }}" {% if pair.reason_id == r.pk %}selected{% endif %}>{{ r.name }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td><input type="number" min="0" name="w_qty_{{ forloop.counter }}" value="{{ pair.qty|default:'' }}" class="form-control form-control-sm reason-qty"></td>
+              </tr>
+            {% endfor %}
+            <tr>
+              <th class="table-light">المجموع / المطلوب</th>
+              <td class="fw-bold"><span id="whiteSum">0</span> / {{ dcp.bb.white.value|default:0 }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="col-12 col-lg-6">
+        <h6 class="mb-2">DCP NC <small class="text-muted">(لازم يساوي الأحمر في B.B = <span id="bbRedEcho">{{ dcp.bb.red.value|default:0 }}</span>)</small></h6>
+        <table class="table excel-grid align-middle text-center" data-sum-target="ncSum">
+          <thead class="table-light"><tr><th style="width:55%;">السبب</th><th>الرقم</th></tr></thead>
+          <tbody>
+            {% for pair in dcp.nc.pairs %}
+              <tr>
+                <td>
+                  <select name="n_reason_{{ forloop.counter }}" class="form-select form-select-sm">
+                    <option value="">—</option>
+                    {% for r in dcp.nc.options %}
+                      <option value="{{ r.pk }}" {% if pair.reason_id == r.pk %}selected{% endif %}>{{ r.name }}</option>
+                    {% endfor %}
+                  </select>
+                </td>
+                <td><input type="number" min="0" name="n_qty_{{ forloop.counter }}" value="{{ pair.qty|default:'' }}" class="form-control form-control-sm reason-qty"></td>
+              </tr>
+            {% endfor %}
+            <tr>
+              <th class="table-light">المجموع / المطلوب</th>
+              <td class="fw-bold"><span id="ncSum">0</span> / {{ dcp.bb.red.value|default:0 }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
+
+    {% if dcp.bb.non_field_errors or dcp.sb.non_field_errors %}
+      <small class="text-danger d-block">{{ dcp.bb.non_field_errors.0 }}</small>
+    {% endif %}
 
     <button type="submit" class="btn btn-primary btn-lg mt-4">حفظ</button>
     <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary mt-4">إلغاء</a>
   </div>
 </form>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  function val(id) {
+    var el = document.querySelector('[name="' + id + '"]');
+    var v = parseFloat(el && el.value);
+    return isNaN(v) ? 0 : v;
+  }
+
+  function updateTests() {
+    document.getElementById("dcpTestTotal").textContent =
+      val("tests-lab_test") + val("tests-floor_test");
+  }
+
+  function updateTotals() {
+    // TOTAL EXP = أخضر + أصفر + أخضر وأصفر + أزرق
+    var tExp = val("bb-green") + val("bb-yellow") + val("bb-green_yellow") + val("bb-blue");
+    var tDom = val("bb-white");
+    var tNc = val("bb-red");
+    var as = val("as-exp") + val("as-dom") + val("as-sb_white");
+    var sb = val("sb-exp") + val("sb-dom") + val("sb-sb_white");
+    var all = tExp + tDom + tNc + as;
+    document.getElementById("t-exp").textContent = tExp;
+    document.getElementById("t-dom").textContent = tDom;
+    document.getElementById("t-nc").textContent = tNc;
+    document.getElementById("t-as").textContent = as;
+    document.getElementById("t-all").textContent = all;
+    document.getElementById("t-sb").textContent = sb;
+    document.getElementById("t-tsb").textContent = sb + as;
+    document.getElementById("bbWhiteEcho").textContent = val("bb-white");
+    document.getElementById("bbRedEcho").textContent = val("bb-red");
+  }
+
+  function sumReasons(prefix, targetId) {
+    var total = 0;
+    [1, 2].forEach(function (i) {
+      var sel = document.querySelector('[name="' + prefix + '_reason_' + i + '"]');
+      var qty = document.querySelector('[name="' + prefix + '_qty_' + i + '"]');
+      if (sel && sel.value && qty) total += parseFloat(qty.value) || 0;
+    });
+    document.getElementById(targetId).textContent = total;
+    return total;
+  }
+
+  ["tests-lab_test", "tests-floor_test"].forEach(function (n) {
+    var el = document.querySelector('[name="' + n + '"]');
+    if (el) el.addEventListener("input", updateTests);
+  });
+
+  ["bb-green", "bb-yellow", "bb-green_yellow", "bb-blue", "bb-white", "bb-red",
+   "as-exp", "as-dom", "as-sb_white", "sb-exp", "sb-dom", "sb-sb_white"].forEach(function (n) {
+    var el = document.querySelector('[name="' + n + '"]');
+    if (el) el.addEventListener("input", updateTotals);
+  });
+
+  [["w", "whiteSum"], ["n", "ncSum"]].forEach(function (pairCfg) {
+    var prefix = pairCfg[0], target = pairCfg[1];
+    [1, 2].forEach(function (i) {
+      var q = document.querySelector('[name="' + prefix + '_qty_' + i + '"]');
+      var s = document.querySelector('[name="' + prefix + '_reason_' + i + '"]');
+      if (q) q.addEventListener("input", function () { sumReasons(prefix, target); });
+      if (s) s.addEventListener("change", function () { sumReasons(prefix, target); });
+    });
+  });
+
+  updateTests();
+  updateTotals();
+  sumReasons("w", "whiteSum");
+  sumReasons("n", "ncSum");
+})();
+</script>
 {% endblock %}

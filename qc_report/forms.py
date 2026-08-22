@@ -2,11 +2,12 @@
 
 from .models import (
     BulkLog,
-    DCPColorGrading,
-    DCPRework,
-    DCPSummary,
-    DCPUnderTest,
-    DCPWhiteQuality,
+    DCPASRow,
+    DCPBBRow,
+    DCPReason,
+    DCPReasonLine,
+    DCPTests,
+    DCPSBRow,
     GCCLineItem,
     LoadingLineItem,
     PALineItem,
@@ -86,60 +87,68 @@ class BulkLogForm(forms.ModelForm):
         }
 
 
-class DCPSummaryForm(ZeroDefaultMixin, forms.ModelForm):
-    zero_fields = (
-        "bb_total",
-        "as_sb_total",
-        "total_1",
-        "total_2",
-        "lab_test_count",
-        "yesterday_test_count",
-        "unlabeled_value",
-    )
-
-    class Meta:
-        model = DCPSummary
-        fields = [
-            "bb_total",
-            "as_sb_total",
-            "total_1",
-            "total_2",
-            "lab_test_count",
-            "yesterday_test_count",
-            "unlabeled_value",
-        ]
-
-
-class DCPColorGradingForm(ZeroDefaultMixin, forms.ModelForm):
+class DCPBBRowForm(ZeroDefaultMixin, forms.ModelForm):
     zero_fields = ("green", "yellow", "green_yellow", "blue", "white", "red")
 
     class Meta:
-        model = DCPColorGrading
-        fields = ["green", "yellow", "green_yellow", "blue", "white", "red"]
+        model = DCPBBRow
+        fields = ["green", "yellow", "green_yellow", "blue", "white", "red", "note"]
+        widgets = {
+            "note": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+        }
 
 
-class DCPUnderTestForm(ZeroDefaultMixin, forms.ModelForm):
-    zero_fields = ("quantity",)
-
-    class Meta:
-        model = DCPUnderTest
-        fields = ["quantity"]
-
-
-class DCPWhiteQualityForm(ZeroDefaultMixin, forms.ModelForm):
-    zero_fields = ("im", "over", "color", "p2o5", "mc", "nc_count")
+class DCPSBRowForm(ZeroDefaultMixin, forms.ModelForm):
+    zero_fields = ("exp", "dom", "sb_white")
 
     class Meta:
-        model = DCPWhiteQuality
-        fields = ["im", "over", "color", "p2o5", "mc", "nc_count"]
+        model = DCPSBRow
+        fields = ["exp", "dom", "sb_white", "note"]
+        widgets = {
+            "note": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+        }
 
 
-class DCPReworkForm(ZeroDefaultMixin, forms.ModelForm):
-    zero_fields = ("total", "green_yellow", "yellow", "green")
+class DCPASRowForm(ZeroDefaultMixin, forms.ModelForm):
+    zero_fields = ("exp", "dom", "sb_white")
 
     class Meta:
-        model = DCPRework
-        fields = ["total", "green_yellow", "yellow", "green"]
+        model = DCPASRow
+        fields = ["exp", "dom", "sb_white", "note"]
+        widgets = {
+            "note": forms.TextInput(attrs={"class": "form-control form-control-sm"}),
+        }
+
+
+class DCPTestsForm(ZeroDefaultMixin, forms.ModelForm):
+    zero_fields = ("lab_test", "floor_test")
+
+    class Meta:
+        model = DCPTests
+        fields = ["lab_test", "floor_test"]
+
+
+def build_dcp_reason_line_form(category, data=None, prefix=""):
+    """فورم سطر سبب مع قائمة منسدلة من إعدادات الأسباب حسب النوع."""
+    form = DCPReasonLineForm(data, prefix=prefix)
+    qs = DCPReason.objects.filter(category=category, is_active=True)
+    form.fields["reason"].queryset = qs
+    return form
+
+
+class DCPReasonLineForm(forms.ModelForm):
+    class Meta:
+        model = DCPReasonLine
+        fields = ["reason", "qty"]
+        widgets = {
+            "qty": forms.NumberInput(
+                attrs={
+                    "type": "number",
+                    "min": 0,
+                    "class": "form-control form-control-sm reason-qty",
+                }
+            )
+        }
 
 
 class PALineItemForm(ZeroDefaultMixin, forms.ModelForm):

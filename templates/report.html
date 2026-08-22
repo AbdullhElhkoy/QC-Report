@@ -126,60 +126,153 @@
 </div>
 
 <h5>DCP</h5>
-<div class="table-responsive mb-4">
-  <table class="table table-bordered text-center align-middle bg-white">
-    <tbody>
-      <tr>
-        <th class="table-light">B.B</th><td>{{ dcp.summary.bb_total }}</td>
-        <th class="table-light">AS S.B</th><td>{{ dcp.summary.as_sb_total }}</td>
-        <th class="table-light">TOTAL (1)</th><td>{{ dcp.summary.total_1 }}</td>
-        <th class="table-light">TOTAL (2)</th><td>{{ dcp.summary.total_2 }}</td>
-      </tr>
-      <tr>
-        <th class="table-light">Lab Tests</th><td>{{ dcp.summary.lab_test_count }}</td>
-        <th class="table-light">Yesterday's Tests</th><td>{{ dcp.summary.yesterday_test_count }}</td>
-        <th class="table-light">Under Test</th><td>{{ dcp.under_test }}</td>
-        <th class="table-light"></th><td></td>
-      </tr>
-    </tbody>
-  </table>
+
+<div class="row mb-3">
+  <div class="col-12 col-lg-7">
+    <div class="card h-100">
+      <div class="card-header">DCP Totals</div>
+      <div class="card-body p-0">
+        <table class="table table-bordered text-center align-middle mb-0">
+          <thead class="table-light">
+            <tr><th>TOTAL EXP</th><th>TOTAL DOM</th><th>TOTAL NC</th><th>AS SB</th><th>Total</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>{{ dcp.totals.total_exp }}</td>
+              <td>{{ dcp.totals.total_dom }}</td>
+              <td>{{ dcp.totals.total_nc }}</td>
+              <td>{{ dcp.totals.as_sb }}</td>
+              <td class="fw-bold">{{ dcp.totals.total }}</td>
+            </tr>
+            <tr>
+              <td colspan="3"></td>
+              <th class="table-light">S.B</th><td>{{ dcp.totals.sb }}</td>
+            </tr>
+            <tr>
+              <td colspan="3"></td>
+              <th class="table-light">TOTAL S.B</th><td class="fw-bold">{{ dcp.totals.total_sb }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-lg-5">
+    <div class="card h-100">
+      <div class="card-header">Tests</div>
+      <div class="card-body p-0">
+        <table class="table table-bordered text-center align-middle mb-0">
+          <tbody>
+            <tr><th class="table-light">Today's Test (Shift 3)</th><td>{{ dcp.tests.today }}</td></tr>
+            <tr><th class="table-light">Yesterday's Test (Shift 3)</th><td>{{ dcp.tests.yesterday }}</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="table-responsive mb-3">
   <table class="table table-bordered text-center align-middle bg-white">
     <thead class="table-light">
-      <tr><th>Category</th><th>Green</th><th>Yellow</th><th>Green & Yellow</th><th>Blue</th><th>White</th><th>Red</th><th>Total</th></tr>
+      <tr><th>Shift</th><th>Green</th><th>Yellow</th><th>Green & Yellow</th><th>Blue</th><th>White</th><th>Red</th><th>Total</th></tr>
     </thead>
     <tbody>
-      {% for c in dcp.categories %}
+      {% for r in dcp.bb_rows %}
         <tr>
-          <th class="table-light">{{ c.category }}</th>
-          <td>{{ c.green }}</td><td>{{ c.yellow }}</td><td>{{ c.green_yellow }}</td>
-          <td>{{ c.blue }}</td><td>{{ c.white }}</td><td>{{ c.red }}</td>
-          <td>{{ c.total }}</td>
+          <th class="table-light">{{ r.shift|title }}</th>
+          <td>{{ r.green }}</td><td>{{ r.yellow }}</td><td>{{ r.green_yellow }}</td>
+          <td>{{ r.blue }}</td><td>{{ r.white }}</td><td>{{ r.red }}</td>
         </tr>
       {% endfor %}
-    </tbody>
-  </table>
-  <table class="table table-bordered text-center align-middle bg-white">
-    <tbody>
-      <tr>
-        <th class="table-light">IM</th><td>{{ dcp.white_quality.im }}</td>
-        <th class="table-light">Over</th><td>{{ dcp.white_quality.over }}</td>
-        <th class="table-light">Color</th><td>{{ dcp.white_quality.color }}</td>
-        <th class="table-light">P2O5</th><td>{{ dcp.white_quality.p2o5 }}</td>
-        <th class="table-light">MC</th><td>{{ dcp.white_quality.mc }}</td>
-        <th class="table-light">NC</th><td>{{ dcp.white_quality.nc_count }}</td>
-      </tr>
-      <tr>
-        <th class="table-light">Rework Total</th><td>{{ dcp.rework.total }}</td>
-        <th class="table-light">Green & Yellow</th><td>{{ dcp.rework.green_yellow }}</td>
-        <th class="table-light">Yellow</th><td>{{ dcp.rework.yellow }}</td>
-        <th class="table-light">Green</th><td>{{ dcp.rework.green }}</td>
+      <tr class="table-secondary fw-bold">
+        <td>Total</td>
+        <td>{{ dcp.bb_total.green }}</td><td>{{ dcp.bb_total.yellow }}</td><td>{{ dcp.bb_total.green_yellow }}</td>
+        <td>{{ dcp.bb_total.blue }}</td><td>{{ dcp.bb_total.white }}</td><td>{{ dcp.bb_total.red }}</td>
       </tr>
     </tbody>
   </table>
-  {% if dcp.notes %}
-    <p class="text-muted">{% for n in dcp.notes %}{{ n }}{% if not forloop.last %} — {% endif %}{% endfor %}</p>
-  {% endif %}
 </div>
+
+<div class="row mb-3">
+  <div class="col-12 col-md-6">
+    <h6>S.B</h6>
+    <div class="table-responsive">
+      <table class="table table-bordered text-center align-middle bg-white">
+        <thead class="table-light"><tr><th>Shift</th><th>EXP</th><th>DOM</th><th>S.B White</th></tr></thead>
+        <tbody>
+          {% for r in dcp.sb_rows %}
+            <tr>
+              <th class="table-light">{{ r.shift|title }}</th>
+              <td>{{ r.exp }}</td><td>{{ r.dom }}</td><td>{{ r.sb_white }}</td>
+            </tr>
+          {% endfor %}
+          <tr class="table-secondary fw-bold">
+            <td>Total</td><td>{{ dcp.sb_total.exp }}</td><td>{{ dcp.sb_total.dom }}</td><td>{{ dcp.sb_total.sb_white }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <h6>S.B AS</h6>
+    <div class="table-responsive">
+      <table class="table table-bordered text-center align-middle bg-white">
+        <thead class="table-light"><tr><th>Shift</th><th>EXP</th><th>DOM</th><th>S.B White</th></tr></thead>
+        <tbody>
+          {% for r in dcp.as_rows %}
+            <tr>
+              <th class="table-light">{{ r.shift|title }}</th>
+              <td>{{ r.exp }}</td><td>{{ r.dom }}</td><td>{{ r.sb_white }}</td>
+            </tr>
+          {% endfor %}
+          <tr class="table-secondary fw-bold">
+            <td>Total</td><td>{{ dcp.as_total.exp }}</td><td>{{ dcp.as_total.dom }}</td><td>{{ dcp.as_total.sb_white }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="row mb-3">
+  <div class="col-12 col-md-6">
+    <h6>DCP White — Reasons</h6>
+    <div class="table-responsive">
+      <table class="table table-bordered text-center align-middle bg-white">
+        <thead class="table-light"><tr><th>Reason</th><th>Qty</th></tr></thead>
+        <tbody>
+          {% for l in dcp.white_lines %}
+            <tr><td>{{ l.name }}</td><td>{{ l.qty }}</td></tr>
+          {% empty %}
+            <tr><td colspan="2" class="text-muted">—</td></tr>
+          {% endfor %}
+          <tr class="fw-bold table-secondary"><td>Total</td><td>{{ dcp.bb_total.white }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div class="col-12 col-md-6">
+    <h6>DCP NC — Reasons</h6>
+    <div class="table-responsive">
+      <table class="table table-bordered text-center align-middle bg-white">
+        <thead class="table-light"><tr><th>Reason</th><th>Qty</th></tr></thead>
+        <tbody>
+          {% for l in dcp.nc_lines %}
+            <tr><td>{{ l.name }}</td><td>{{ l.qty }}</td></tr>
+          {% empty %}
+            <tr><td colspan="2" class="text-muted">—</td></tr>
+          {% endfor %}
+          <tr class="fw-bold table-secondary"><td>Total</td><td>{{ dcp.bb_total.red }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+{% if dcp.notes %}
+  <p class="text-muted">{% for n in dcp.notes %}{{ n }}{% if not forloop.last %} — {% endif %}{% endfor %}</p>
+{% endif %}
 
 <h5>PA / SA</h5>
 <div class="table-responsive mb-4">

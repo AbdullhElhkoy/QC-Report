@@ -47,13 +47,6 @@ class LoadingProductType(models.TextChoices):
     HCL = "HCL", "HCL"
 
 
-class ColorGradingCategory(models.TextChoices):
-    TOTAL = "TOTAL", "Total"
-    EX_SB = "EX_SB", "EX S.B"
-    DOM_SB = "DOM_SB", "DOM S.B"
-    SB_WHITE = "SB_WHITE", "S.B White"
-
-
 SOP_PRODUCT_TYPES = {
     Unit.SOP_A: [ProductType.S_B, ProductType.B_B, ProductType.BULK],
     Unit.SOP_B: [ProductType.S_B, ProductType.B_B, ProductType.BULK],
@@ -142,81 +135,127 @@ class SOPLineItem(models.Model):
         return f"{self.shift_entry} - {self.get_product_type_display()}"
 
 
-class DCPSummary(models.Model):
-    shift_entry = models.OneToOneField(
-        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_summary"
-    )
-    bb_total = models.DecimalField("B.B", max_digits=10, decimal_places=2, default=0)
-    as_sb_total = models.DecimalField("AS S.B", max_digits=10, decimal_places=2, default=0)
-    total_1 = models.DecimalField("TOTAL (1)", max_digits=10, decimal_places=2, default=0)
-    total_2 = models.DecimalField("TOTAL (2)", max_digits=10, decimal_places=2, default=0)
-    lab_test_count = models.PositiveIntegerField("اختبار معمل", default=0)
-    yesterday_test_count = models.PositiveIntegerField("اختبار امس", default=0)
-    unlabeled_value = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-
-    def __str__(self):
-        return f"DCP Summary - {self.shift_entry}"
+class DCPReasonCategory(models.TextChoices):
+    WHITE = "WHITE", "DCP White"
+    NC = "NC", "DCP NC"
 
 
-class DCPColorGrading(models.Model):
-    shift_entry = models.ForeignKey(
-        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_color_gradings"
-    )
-    category = models.CharField("الفئة", max_length=10, choices=ColorGradingCategory.choices)
-    green = models.PositiveIntegerField("أخضر", default=0)
-    yellow = models.PositiveIntegerField("أصفر", default=0)
-    green_yellow = models.PositiveIntegerField("أخضر وأصفر", default=0)
-    blue = models.PositiveIntegerField("أزرق", default=0)
-    white = models.PositiveIntegerField("أبيض", default=0)
-    red = models.PositiveIntegerField("أحمر", default=0)
+class DCPReason(models.Model):
+    """أسباب الأبيض/الأحمر — بتتدار من الإعدادات (Admin)."""
+
+    category = models.CharField("النوع", max_length=10, choices=DCPReasonCategory.choices)
+    name = models.CharField("السبب", max_length=50)
+    order = models.PositiveIntegerField("الترتيب", default=0)
+    is_active = models.BooleanField("مفعل", default=True)
 
     class Meta:
-        ordering = ["category"]
+        ordering = ["category", "order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["category", "name"], name="uniq_dcp_reason_per_category"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.get_category_display()} - {self.name}"
+
+
+class DCPBBRow(models.Model):
+    """جدول B.B رقم 1: عدد الألوان لكل وردية."""
+
+    shift_entry = models.OneToOneField(
+        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_bb"
+    )
+    green = models.PositiveIntegerField("Green", default=0)
+    yellow = models.PositiveIntegerField("Yellow", default=0)
+    green_yellow = models.PositiveIntegerField("Green & Yellow", default=0)
+    blue = models.PositiveIntegerField("Blue", default=0)
+    white = models.PositiveIntegerField("White", default=0)
+    red = models.PositiveIntegerField("Red", default=0)
+    note = models.CharField("Note", max_length=200, blank=True)
 
     @property
     def total(self):
-        return self.green + self.yellow + self.green_yellow + self.blue + self.white + self.red
+        return (
+            self.green
+            + self.yellow
+            + self.green_yellow
+            + self.blue
+            + self.white
+            + self.red
+        )
 
     def __str__(self):
-        return f"{self.shift_entry} - {self.get_category_display()}"
+        return f"B.B - {self.shift_entry}"
 
 
-class DCPUnderTest(models.Model):
+class _DCPSBBase(models.Model):
     shift_entry = models.OneToOneField(
-        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_under_test"
+        ShiftEntry, on_delete=models.CASCADE, related_name="+"
     )
-    quantity = models.DecimalField("الكمية", max_digits=10, decimal_places=2, default=0)
+    exp = models.DecimalField("EXP", max_digits=10, decimal_places=2, default=0)
+    dom = models.DecimalField("DOM", max_digits=10, decimal_places=2, default=0)
+    sb_white = models.DecimalField("S.B White", max_digits=10, decimal_places=2, default=0)
+    note = models.CharField("Note", max_length=200, blank=True)
+
+    class Meta:
+        abstract = True
+
+    @property
+    def total(self):
+        return self.exp + self.dom + self.sb_white
 
     def __str__(self):
-        return f"Under Test - {self.shift_entry}"
+        return f"{self._meta.object_name} - {self.shift_entry}"
 
 
-class DCPWhiteQuality(models.Model):
+class DCPSBRow(_DCPSBBase):
+    """جدول S.B رقم 2."""
+
     shift_entry = models.OneToOneField(
-        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_white_quality"
+        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_sb"
     )
-    im = models.DecimalField("IM", max_digits=10, decimal_places=2, default=0)
-    over = models.DecimalField("Over", max_digits=10, decimal_places=2, default=0)
-    color = models.DecimalField("Color", max_digits=10, decimal_places=2, default=0)
-    p2o5 = models.DecimalField("P2O5", max_digits=10, decimal_places=2, default=0)
-    mc = models.DecimalField("MC", max_digits=10, decimal_places=2, default=0)
-    nc_count = models.PositiveIntegerField("عدد NC", default=0)
-
-    def __str__(self):
-        return f"White Quality - {self.shift_entry}"
 
 
-class DCPRework(models.Model):
+class DCPASRow(_DCPSBBase):
+    """جدول S.B AS رقم 3."""
+
     shift_entry = models.OneToOneField(
-        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_rework"
+        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_as"
     )
-    total = models.DecimalField("اجمالي", max_digits=10, decimal_places=2, default=0)
-    green_yellow = models.DecimalField("اخضر واصفر", max_digits=10, decimal_places=2, default=0)
-    yellow = models.DecimalField("اصفر", max_digits=10, decimal_places=2, default=0)
-    green = models.DecimalField("اخضر", max_digits=10, decimal_places=2, default=0)
+
+
+class DCPReasonLine(models.Model):
+    """سطر سبب: الرقم ممكن يتوزع على سبب أو أكتر (White أو NC)."""
+
+    shift_entry = models.ForeignKey(
+        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_reason_lines"
+    )
+    reason = models.ForeignKey(DCPReason, on_delete=models.PROTECT, verbose_name="السبب")
+    qty = models.PositiveIntegerField("الرقم", default=0)
+
+    class Meta:
+        ordering = ["reason__category", "reason__order", "id"]
 
     def __str__(self):
-        return f"Rework - {self.shift_entry}"
+        return f"{self.reason.name}: {self.qty} ({self.shift_entry})"
+
+
+class DCPTests(models.Model):
+    """اختبار معمل + اختبار أرضية (والإجمالي بيتحسب)."""
+
+    shift_entry = models.OneToOneField(
+        ShiftEntry, on_delete=models.CASCADE, related_name="dcp_tests"
+    )
+    lab_test = models.PositiveIntegerField("اختبار معمل", default=0)
+    floor_test = models.PositiveIntegerField("اختبار أرضية", default=0)
+
+    @property
+    def total_tests(self):
+        return self.lab_test + self.floor_test
+
+    def __str__(self):
+        return f"Tests - {self.shift_entry}"
 
 
 class PALineItem(models.Model):
