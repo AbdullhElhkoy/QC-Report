@@ -132,9 +132,12 @@
     <div class="card h-100">
       <div class="card-header">DCP Totals</div>
       <div class="card-body p-0">
-        <table class="table table-bordered text-center align-middle mb-0">
+        <table class="table table-bordered text-center align-middle mb-0 table-sm">
           <thead class="table-light">
-            <tr><th>TOTAL EXP</th><th>TOTAL DOM</th><th>TOTAL NC</th><th>AS SB</th><th>Total</th></tr>
+            <tr>
+              <th>TOTAL EXP</th><th>TOTAL DOM</th><th>TOTAL NC</th><th>AS SB</th>
+              <th>Total</th><th>S.B</th><th>TOTAL S.B</th>
+            </tr>
           </thead>
           <tbody>
             <tr>
@@ -143,14 +146,8 @@
               <td>{{ dcp.totals.total_nc }}</td>
               <td>{{ dcp.totals.as_sb }}</td>
               <td class="fw-bold">{{ dcp.totals.total }}</td>
-            </tr>
-            <tr>
-              <td colspan="3"></td>
-              <th class="table-light">S.B</th><td>{{ dcp.totals.sb }}</td>
-            </tr>
-            <tr>
-              <td colspan="3"></td>
-              <th class="table-light">TOTAL S.B</th><td class="fw-bold">{{ dcp.totals.total_sb }}</td>
+              <td>{{ dcp.totals.sb }}</td>
+              <td class="fw-bold">{{ dcp.totals.total_sb }}</td>
             </tr>
           </tbody>
         </table>
@@ -180,7 +177,7 @@
     <tbody>
       {% for r in dcp.bb_rows %}
         <tr>
-          <th class="table-light">{{ r.shift|title }}</th>
+          <th class="table-light">{{ r.label }}</th>
           <td>{{ r.green }}</td><td>{{ r.yellow }}</td><td>{{ r.green_yellow }}</td>
           <td>{{ r.blue }}</td><td>{{ r.white }}</td><td>{{ r.red }}</td>
         </tr>
@@ -203,7 +200,7 @@
         <tbody>
           {% for r in dcp.sb_rows %}
             <tr>
-              <th class="table-light">{{ r.shift|title }}</th>
+              <th class="table-light">{{ r.label }}</th>
               <td>{{ r.exp }}</td><td>{{ r.dom }}</td><td>{{ r.sb_white }}</td>
             </tr>
           {% endfor %}
@@ -222,7 +219,7 @@
         <tbody>
           {% for r in dcp.as_rows %}
             <tr>
-              <th class="table-light">{{ r.shift|title }}</th>
+              <th class="table-light">{{ r.label }}</th>
               <td>{{ r.exp }}</td><td>{{ r.dom }}</td><td>{{ r.sb_white }}</td>
             </tr>
           {% endfor %}
@@ -235,38 +232,44 @@
   </div>
 </div>
 
-<div class="row mb-3">
-  <div class="col-12 col-md-6">
-    <h6>DCP White — Reasons</h6>
-    <div class="table-responsive">
-      <table class="table table-bordered text-center align-middle bg-white">
-        <thead class="table-light"><tr><th>Reason</th><th>Qty</th></tr></thead>
-        <tbody>
-          {% for l in dcp.white_lines %}
-            <tr><td>{{ l.name }}</td><td>{{ l.qty }}</td></tr>
-          {% empty %}
-            <tr><td colspan="2" class="text-muted">—</td></tr>
-          {% endfor %}
-          <tr class="fw-bold table-secondary"><td>Total</td><td>{{ dcp.bb_total.white }}</td></tr>
-        </tbody>
-      </table>
-    </div>
+<div class="mb-3">
+  <h6>DCP White — Reasons</h6>
+  <div class="table-responsive">
+    <table class="table table-bordered text-center align-middle bg-white mb-2 table-sm">
+      <thead class="table-light">
+        <tr>
+          <th>Reason</th>
+          {% for l in dcp.white_lines %}<th>{{ l.name }}</th>{% endfor %}
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th class="table-light">Qty</th>
+          {% for l in dcp.white_lines %}<td>{{ l.qty }}</td>{% endfor %}
+          <td class="fw-bold">{{ dcp.bb_total.white }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
-  <div class="col-12 col-md-6">
-    <h6>DCP NC — Reasons</h6>
-    <div class="table-responsive">
-      <table class="table table-bordered text-center align-middle bg-white">
-        <thead class="table-light"><tr><th>Reason</th><th>Qty</th></tr></thead>
-        <tbody>
-          {% for l in dcp.nc_lines %}
-            <tr><td>{{ l.name }}</td><td>{{ l.qty }}</td></tr>
-          {% empty %}
-            <tr><td colspan="2" class="text-muted">—</td></tr>
-          {% endfor %}
-          <tr class="fw-bold table-secondary"><td>Total</td><td>{{ dcp.bb_total.red }}</td></tr>
-        </tbody>
-      </table>
-    </div>
+  <h6>DCP NC — Reasons</h6>
+  <div class="table-responsive">
+    <table class="table table-bordered text-center align-middle bg-white table-sm">
+      <thead class="table-light">
+        <tr>
+          <th>Reason</th>
+          {% for l in dcp.nc_lines %}<th>{{ l.name }}</th>{% endfor %}
+          <th>Total</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th class="table-light">Qty</th>
+          {% for l in dcp.nc_lines %}<td>{{ l.qty }}</td>{% endfor %}
+          <td class="fw-bold">{{ dcp.bb_total.red }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </div>
 

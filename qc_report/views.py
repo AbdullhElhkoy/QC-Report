@@ -203,7 +203,7 @@ def save_loading_rows(entry, data):
 
 
 def dcp_reason_context(entry, category):
-    """خيارات القائمة المنسدلة + القيم المحفوظة (سببين كحد أقصى)."""
+    """خيارات القائمة المنسدلة + الصفوف المحفوظة (عدد مفتوح)."""
     qs = DCPReason.objects.filter(category=category, is_active=True).order_by(
         "order", "id"
     )
@@ -212,15 +212,10 @@ def dcp_reason_context(entry, category):
         saved = list(
             entry.dcp_reason_lines.filter(reason__category=category).order_by("id")
         )
-    pairs = []
-    for i in range(2):
-        line = saved[i] if i < len(saved) else None
-        pairs.append(
-            {
-                "reason_id": line.reason_id if line else None,
-                "qty": line.qty if line else None,
-            }
-        )
+    if saved:
+        pairs = [{"reason_id": l.reason_id, "qty": l.qty} for l in saved]
+    else:
+        pairs = [{"reason_id": None, "qty": None}]
     return {"options": qs, "pairs": pairs}
 
 
@@ -260,10 +255,10 @@ def save_dcp_forms(entry, data):
         raise ValidationError("بيانات DCP غير مكتملة.")
 
     def collect_lines(prefix, category):
+        reasons = data.getlist(f"{prefix}_reason")
+        qtys = data.getlist(f"{prefix}_qty")
         lines, total = [], 0
-        for i in (1, 2):
-            raw_r = data.get(f"{prefix}_reason_{i}")
-            raw_q = data.get(f"{prefix}_qty_{i}")
+        for raw_r, raw_q in zip(reasons, qtys):
             if not raw_r:
                 continue
             try:
@@ -283,7 +278,7 @@ def save_dcp_forms(entry, data):
     w_ids = [l.reason_id for l in white_lines]
     n_ids = [l.reason_id for l in nc_lines]
     if len(w_ids) != len(set(w_ids)) or len(n_ids) != len(set(n_ids)):
-        raise ValidationError("لا يمكن اختيار نفس السبب مرتين في نفس الجدول.")
+        raise ValidationError("لا يمكن اختيار نفس السبب أكثر من مرة في نفس الجدول.")
 
     entry.dcp_reason_lines.all().delete()
     DCPReasonLine.objects.bulk_create(white_lines + nc_lines)

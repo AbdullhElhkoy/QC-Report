@@ -208,11 +208,9 @@
 <table>
     <thead>
         <tr class="th-blue">
-            <th colspan="5">DCP Totals</th><th colspan="2">Tests</th>
-        </tr>
-        <tr class="th-blue">
-            <th>TOTAL EXP</th><th>TOTAL DOM</th><th>TOTAL NC</th><th>AS SB</th><th>Total</th>
-            <th>Today (S3)</th><th>Yesterday (S3)</th>
+            <th>TOTAL EXP</th><th>TOTAL DOM</th><th>TOTAL NC</th><th>AS SB</th>
+            <th>Total</th><th>S.B</th><th>TOTAL S.B</th>
+            <th>Test Today (S3)</th><th>Test Yesterday (S3)</th>
         </tr>
     </thead>
     <tbody>
@@ -221,16 +219,11 @@
             <td>{{ dcp.totals.total_dom }}</td>
             <td class="cell-nc">{{ dcp.totals.total_nc }}</td>
             <td>{{ dcp.totals.as_sb }}</td>
-            <td>{{ dcp.totals.total }}</td>
+            <td style="font-weight:bold;">{{ dcp.totals.total }}</td>
+            <td>{{ dcp.totals.sb }}</td>
+            <td style="font-weight:bold;">{{ dcp.totals.total_sb }}</td>
             <td>{{ dcp.tests.today }}</td>
             <td>{{ dcp.tests.yesterday }}</td>
-        </tr>
-        <tr>
-            <td colspan="3"></td>
-            <td class="th-grey">S.B</td>
-            <td>{{ dcp.totals.sb }}</td>
-            <td class="th-grey">TOTAL S.B</td>
-            <td>{{ dcp.totals.total_sb }}</td>
         </tr>
     </tbody>
 </table>
@@ -245,7 +238,7 @@
     <tbody>
         {% for r in dcp.bb_rows %}
         <tr>
-            <td class="th-grey">{{ r.shift|title }}</td>
+            <td class="th-grey">{{ r.label }}</td>
             <td>{{ r.green }}</td><td>{{ r.yellow }}</td><td>{{ r.green_yellow }}</td>
             <td>{{ r.blue }}</td><td>{{ r.white }}</td>
             <td class="cell-nc">{{ r.red }}</td>
@@ -271,10 +264,10 @@
     <tbody>
         {% for s in dcp.sb_rows %}
         <tr>
-            <td class="th-grey">{{ s.shift|title }}</td>
+            <td class="th-grey">{{ s.label }}</td>
             <td>{{ s.exp }}</td><td>{{ s.dom }}</td><td>{{ s.sb_white }}</td>
             {% with a=dcp.as_rows|index:forloop.counter0 %}
-            <td class="th-grey">{{ a.shift|title }}</td>
+            <td class="th-grey">{{ a.label }}</td>
             <td>{{ a.exp }}</td><td>{{ a.dom }}</td><td>{{ a.sb_white }}</td>
             {% endwith %}
         </tr>
@@ -290,24 +283,36 @@
 
 <table>
     <thead>
-        <tr class="th-yellow"><th colspan="2">DCP White — Reasons</th><th colspan="2">DCP NC — Reasons</th></tr>
-        <tr class="th-yellow"><th>Reason</th><th>Qty</th><th>Reason</th><th>Qty</th></tr>
+        <tr class="th-yellow"><th colspan="4">DCP White — Reasons</th></tr>
+        <tr class="th-yellow">
+            <th>Reason</th>
+            {% for wl in dcp.white_lines %}<th>{{ wl.name }}</th>{% endfor %}
+            <th>Total</th>
+        </tr>
     </thead>
     <tbody>
-        {% for wl in dcp.white_lines %}
         <tr>
-            <td>{{ wl.name }}</td><td>{{ wl.qty }}</td>
-            {% with nl=dcp.nc_lines|index:forloop.counter0 %}
-            <td>{% if nl %}{{ nl.name }}{% endif %}</td>
-            <td>{% if nl %}{{ nl.qty }}{% endif %}</td>
-            {% endwith %}
+            <td class="th-grey">Qty</td>
+            {% for wl in dcp.white_lines %}<td>{{ wl.qty }}</td>{% endfor %}
+            <td style="font-weight:bold;">{{ dcp.bb_total.white }}</td>
         </tr>
-        {% empty %}
-        <tr><td colspan="4" style="text-align:center;">—</td></tr>
-        {% endfor %}
-        <tr style="font-weight:bold;">
-            <td class="th-grey">Total</td><td>{{ dcp.bb_total.white }}</td>
-            <td class="th-grey">Total</td><td>{{ dcp.bb_total.red }}</td>
+    </tbody>
+</table>
+
+<table>
+    <thead>
+        <tr class="th-yellow"><th colspan="4">DCP NC — Reasons</th></tr>
+        <tr class="th-yellow">
+            <th>Reason</th>
+            {% for nl in dcp.nc_lines %}<th>{{ nl.name }}</th>{% endfor %}
+            <th>Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td class="th-grey">Qty</td>
+            {% for nl in dcp.nc_lines %}<td>{{ nl.qty }}</td>{% endfor %}
+            <td style="font-weight:bold;">{{ dcp.bb_total.red }}</td>
         </tr>
     </tbody>
 </table>

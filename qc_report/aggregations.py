@@ -133,27 +133,37 @@ def sop_section(start, end=None):
     }
 
 
-def _sum_rows_by_shift(qs, fields):
-    """يجمع صفوف الموديل حسب الوردية: 3 صفوف + إجمالي."""
-    shifts = {"SHIFT_1": {}, "SHIFT_2": {}, "SHIFT_3": {}}
-    totals = {f: 0 for f in fields}
+def _group_rows(qs, fields, mode, start, end):
+    """يجمع الصفوف: يوم واحد => 3 ورديات دايماً، فترة => صف لكل يوم."""
+    import datetime as _dt
+
+    buckets = {}
     order = []
     for row in qs.select_related("shift_entry"):
-        sh = row.shift_entry.shift
-        if sh not in shifts:
-            continue
-        if sh not in order:
-            order.append(sh)
-        bucket = shifts[sh]
+        e = row.shift_entry
+        if mode == "shift":
+            key = e.shift
+            label = {"SHIFT_1": "Shift 1", "SHIFT_2": "Shift 2", "SHIFT_3": "Shift 3"}[key]
+        else:
+            key = e.entry_date
+            label = e.entry_date.strftime("%Y-%m-%d")
+        if key not in buckets:
+            buckets[key] = {"label": label, **{f: 0 for f in fields}}
+            order.append(key)
         for f in fields:
-            bucket[f] = bucket.get(f, 0) + getattr(row, f)
-            totals[f] += getattr(row, f)
+            buckets[key][f] += getattr(row, f)
+    if mode == "shift":
+        keys = [("SHIFT_1", "Shift 1"), ("SHIFT_2", "Shift 2"), ("SHIFT_3", "Shift 3")]
+        return [buckets.get(k, {"label": lb, **{f: 0 for f in fields}}) for k, lb in keys]
+    day = start
     rows = []
-    for sh in ("SHIFT_1", "SHIFT_2", "SHIFT_3"):
-        data = {"shift": sh, **{f: shifts[sh].get(f, 0) for f in fields}}
-        if any(data[f] for f in fields):
-            rows.append(data)
-    return rows, totals
+    while day <= end:
+        b = buckets.get(day)
+        if not b:
+            b = {"label": day.strftime("%Y-%m-%d"), **{f: 0 for f in fields}}
+        rows.append(b)
+        day += _dt.timedelta(days=1)
+    return rows
 
 
 def dcp_section(start, end=None):
@@ -164,9 +174,17 @@ def dcp_section(start, end=None):
     sb_qs = DCPSBRow.objects.filter(shift_entry__in=entries)
     as_qs = DCPASRow.objects.filter(shift_entry__in=entries)
 
-    bb_rows, bb_t = _sum_rows_by_shift(bb_qs, ["green", "yellow", "green_yellow", "blue", "white", "red"])
-    sb_rows, sb_t = _sum_rows_by_shift(sb_qs, ["exp", "dom", "sb_white"])
-    as_rows, as_t = _sum_rows_by_shift(as_qs, ["exp", "dom", "sb_white"])
+    bb_fields = ["green", "yellow", "green_yellow", "blue", "white", "red"]
+    sb_fields = ["exp", "dom", "sb_white"]
+    # يوم أو يومين => ورديات، أكتر من كده => صف لكل تاريخ
+    mode = "shift" if (end - start).days + 1 <= 2 else "date"
+    bb_rows = _group_rows(bb_qs, bb_fields, mode, start, end)
+    sb_rows = _group_rows(sb_qs, sb_fields, mode, start, end)
+    as_rows = _group_rows(as_qs, sb_fields, mode, start, end)
+
+    bb_t = {f: sum(r[f] for r in bb_rows) for f in bb_fields}
+    sb_t = {f: sum(r[f] for r in sb_rows) for f in sb_fields}
+    as_t = {f: sum(r[f] for r in as_rows) for f in sb_fields}
 
     total_exp = bb_t["green"] + bb_t["yellow"] + bb_t["green_yellow"] + bb_t["blue"]
     total_dom = bb_t["white"]

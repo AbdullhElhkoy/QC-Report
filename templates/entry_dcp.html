@@ -127,53 +127,61 @@
     <div class="row g-3 mt-1">
       <div class="col-12 col-lg-6">
         <h6 class="mb-2">DCP White <small class="text-muted">(لازم يساوي الأبيض في B.B = <span id="bbWhiteEcho">{{ dcp.bb.white.value|default:0 }}</span>)</small></h6>
-        <table class="table excel-grid align-middle text-center" data-sum-target="whiteSum">
-          <thead class="table-light"><tr><th style="width:55%;">السبب</th><th>الرقم</th></tr></thead>
+        <table class="table excel-grid align-middle text-center" id="whiteReasons">
+          <thead class="table-light"><tr><th style="width:55%;">السبب</th><th>الرقم</th><th></th></tr></thead>
           <tbody>
             {% for pair in dcp.white.pairs %}
-              <tr>
+              <tr data-reason-row>
                 <td>
-                  <select name="w_reason_{{ forloop.counter }}" class="form-select form-select-sm">
+                  <select name="w_reason" class="form-select form-select-sm">
                     <option value="">—</option>
                     {% for r in dcp.white.options %}
                       <option value="{{ r.pk }}" {% if pair.reason_id == r.pk %}selected{% endif %}>{{ r.name }}</option>
                     {% endfor %}
                   </select>
                 </td>
-                <td><input type="number" min="0" name="w_qty_{{ forloop.counter }}" value="{{ pair.qty|default:'' }}" class="form-control form-control-sm reason-qty"></td>
+                <td><input type="number" min="0" name="w_qty" value="{{ pair.qty|default:'' }}" class="form-control form-control-sm reason-qty"></td>
+                <td><button type="button" class="btn btn-sm btn-outline-danger remove-reason">✕</button></td>
               </tr>
             {% endfor %}
             <tr>
               <th class="table-light">المجموع / المطلوب</th>
               <td class="fw-bold"><span id="whiteSum">0</span> / {{ dcp.bb.white.value|default:0 }}</td>
+              <td></td>
             </tr>
           </tbody>
         </table>
+        <button type="button" class="btn btn-sm btn-outline-primary add-reason mt-1"
+                data-target="whiteReasons" data-prefix="w">+ إضافة سبب</button>
       </div>
       <div class="col-12 col-lg-6">
         <h6 class="mb-2">DCP NC <small class="text-muted">(لازم يساوي الأحمر في B.B = <span id="bbRedEcho">{{ dcp.bb.red.value|default:0 }}</span>)</small></h6>
-        <table class="table excel-grid align-middle text-center" data-sum-target="ncSum">
-          <thead class="table-light"><tr><th style="width:55%;">السبب</th><th>الرقم</th></tr></thead>
+        <table class="table excel-grid align-middle text-center" id="ncReasons">
+          <thead class="table-light"><tr><th style="width:55%;">السبب</th><th>الرقم</th><th></th></tr></thead>
           <tbody>
             {% for pair in dcp.nc.pairs %}
-              <tr>
+              <tr data-reason-row>
                 <td>
-                  <select name="n_reason_{{ forloop.counter }}" class="form-select form-select-sm">
+                  <select name="n_reason" class="form-select form-select-sm">
                     <option value="">—</option>
                     {% for r in dcp.nc.options %}
                       <option value="{{ r.pk }}" {% if pair.reason_id == r.pk %}selected{% endif %}>{{ r.name }}</option>
                     {% endfor %}
                   </select>
                 </td>
-                <td><input type="number" min="0" name="n_qty_{{ forloop.counter }}" value="{{ pair.qty|default:'' }}" class="form-control form-control-sm reason-qty"></td>
+                <td><input type="number" min="0" name="n_qty" value="{{ pair.qty|default:'' }}" class="form-control form-control-sm reason-qty"></td>
+                <td><button type="button" class="btn btn-sm btn-outline-danger remove-reason">✕</button></td>
               </tr>
             {% endfor %}
             <tr>
               <th class="table-light">المجموع / المطلوب</th>
               <td class="fw-bold"><span id="ncSum">0</span> / {{ dcp.bb.red.value|default:0 }}</td>
+              <td></td>
             </tr>
           </tbody>
         </table>
+        <button type="button" class="btn btn-sm btn-outline-primary add-reason mt-1"
+                data-target="ncReasons" data-prefix="n">+ إضافة سبب</button>
       </div>
     </div>
 
@@ -222,14 +230,37 @@
 
   function sumReasons(prefix, targetId) {
     var total = 0;
-    [1, 2].forEach(function (i) {
-      var sel = document.querySelector('[name="' + prefix + '_reason_' + i + '"]');
-      var qty = document.querySelector('[name="' + prefix + '_qty_' + i + '"]');
-      if (sel && sel.value && qty) total += parseFloat(qty.value) || 0;
+    document.querySelectorAll('[name="' + prefix + '_reason"]').forEach(function (sel) {
+      if (sel.value) {
+        var row = sel.closest("tr");
+        var qty = row && row.querySelector('[name="' + prefix + '_qty"]');
+        if (qty) total += parseFloat(qty.value) || 0;
+      }
     });
     document.getElementById(targetId).textContent = total;
     return total;
   }
+
+  // إضافة / حذف صفوف الأسباب
+  document.querySelectorAll(".add-reason").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var table = document.getElementById(btn.dataset.target);
+      var tbody = table.querySelector("tbody");
+      var templateRow = tbody.querySelector("[data-reason-row]");
+      var newRow = templateRow.cloneNode(true);
+      newRow.querySelectorAll("select").forEach(function (s) { s.value = ""; });
+      newRow.querySelectorAll("input").forEach(function (i) { i.value = ""; });
+      tbody.insertBefore(newRow, tbody.querySelector("tr:last-child"));
+    });
+  });
+
+  document.addEventListener("click", function (ev) {
+    var btn = ev.target.closest(".remove-reason");
+    if (!btn) return;
+    var table = btn.closest("table");
+    var rows = table.querySelectorAll("[data-reason-row]");
+    if (rows.length > 1) btn.closest("[data-reason-row]").remove();
+  });
 
   ["tests-lab_test", "tests-floor_test"].forEach(function (n) {
     var el = document.querySelector('[name="' + n + '"]');
@@ -244,11 +275,12 @@
 
   [["w", "whiteSum"], ["n", "ncSum"]].forEach(function (pairCfg) {
     var prefix = pairCfg[0], target = pairCfg[1];
-    [1, 2].forEach(function (i) {
-      var q = document.querySelector('[name="' + prefix + '_qty_' + i + '"]');
-      var s = document.querySelector('[name="' + prefix + '_reason_' + i + '"]');
-      if (q) q.addEventListener("input", function () { sumReasons(prefix, target); });
-      if (s) s.addEventListener("change", function () { sumReasons(prefix, target); });
+    var handler = function () { sumReasons(prefix, target); };
+    document.addEventListener("input", function (ev) {
+      if (ev.target.matches('[name="' + prefix + '_qty"]')) handler();
+    });
+    document.addEventListener("change", function (ev) {
+      if (ev.target.matches('[name="' + prefix + '_reason"]')) handler();
     });
   });
 
