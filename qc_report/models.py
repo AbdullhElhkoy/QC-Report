@@ -258,37 +258,51 @@ class DCPTests(models.Model):
         return f"Tests - {self.shift_entry}"
 
 
-class PALineItem(models.Model):
-    shift_entry = models.ForeignKey(
-        ShiftEntry, on_delete=models.CASCADE, related_name="pa_line_items"
-    )
-    jc_43 = models.DecimalField("JC 43", max_digits=10, decimal_places=2, default=0)
-    jc_62 = models.DecimalField("JC 62", max_digits=10, decimal_places=2, default=0)
-    cube_43 = models.DecimalField("Cube 43", max_digits=10, decimal_places=2, default=0)
-    cube_61 = models.DecimalField("Cube 61", max_digits=10, decimal_places=2, default=0)
+class PackingFactory(models.TextChoices):
+    PA = "PA", "PA"
+    SA = "SA", "SA"
+
+
+class PackingType(models.Model):
+    """أنواع التعبئة لجداول PA وSA — ديناميكية وتتدار من الإعدادات (Admin) فقط."""
+
+    factory = models.CharField("المصنع", max_length=5, choices=PackingFactory.choices)
+    name = models.CharField("نوع التعبئة", max_length=50)
+    order = models.PositiveIntegerField("الترتيب", default=0)
+    is_active = models.BooleanField("مفعل", default=True)
 
     class Meta:
-        ordering = ["id"]
-
-    @property
-    def total(self):
-        return self.jc_43 + self.jc_62 + self.cube_43 + self.cube_61
+        ordering = ["factory", "order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["factory", "name"], name="uniq_packing_type_per_factory"
+            )
+        ]
 
     def __str__(self):
-        return f"PA - {self.shift_entry}"
+        return f"{self.get_factory_display()} - {self.name}"
 
 
-class SALineItem(models.Model):
+class PackingLineItem(models.Model):
     shift_entry = models.ForeignKey(
-        ShiftEntry, on_delete=models.CASCADE, related_name="sa_line_items"
+        ShiftEntry, on_delete=models.CASCADE, related_name="packing_items"
     )
-    jc = models.DecimalField("JC", max_digits=10, decimal_places=2, default=0)
+    packing_type = models.ForeignKey(
+        PackingType, on_delete=models.PROTECT, verbose_name="نوع التعبئة"
+    )
+    value = models.DecimalField("القيمة", max_digits=10, decimal_places=2, default=0)
 
     class Meta:
-        ordering = ["id"]
+        ordering = ["packing_type__factory", "packing_type__order", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["shift_entry", "packing_type"],
+                name="uniq_packing_value_per_entry",
+            )
+        ]
 
     def __str__(self):
-        return f"SA - {self.shift_entry}"
+        return f"{self.packing_type.name}: {self.value} ({self.shift_entry})"
 
 
 class GCCLineItem(models.Model):

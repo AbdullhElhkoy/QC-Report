@@ -324,17 +324,29 @@
 <table>
     <thead>
         <tr class="th-green">
-            <th colspan="4">PA</th><th colspan="1">SA</th>
-        </tr>
-        <tr class="th-green">
-            <th>JC 43%</th><th>JC 62%</th><th>Cube 43%</th><th>Cube 61%</th><th>JC</th>
+            <th>PA</th>{% for c in pa.columns %}<th>{{ c }}</th>{% endfor %}<th>Total</th>
         </tr>
     </thead>
     <tbody>
         <tr>
-            <td>{{ pa.jc_43 }}</td><td>{{ pa.jc_62 }}</td>
-            <td>{{ pa.cube_43 }}</td><td>{{ pa.cube_61 }}</td>
-            <td>{{ sa.jc }}</td>
+            <td style="font-weight:bold;">Qty</td>
+            {% for v in pa.values %}<td>{{ v }}</td>{% endfor %}
+            <td style="font-weight:bold;">{{ pa.total }}</td>
+        </tr>
+    </tbody>
+</table>
+
+<table>
+    <thead>
+        <tr class="th-green">
+            <th>SA</th>{% for c in sa.columns %}<th>{{ c }}</th>{% endfor %}<th>Total</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td style="font-weight:bold;">Qty</td>
+            {% for v in sa.values %}<td>{{ v }}</td>{% endfor %}
+            <td style="font-weight:bold;">{{ sa.total }}</td>
         </tr>
     </tbody>
 </table>

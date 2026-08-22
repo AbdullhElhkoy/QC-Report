@@ -13,10 +13,11 @@ from .models import (
     GCCLineItem,
     LoadingLineItem,
     LoadingProductType,
-    PALineItem,
+    PackingFactory,
+    PackingLineItem,
+    PackingType,
     PackageType,
     ProductType,
-    SALineItem,
     Shift,
     ShiftEntry,
     SOPLineItem,
@@ -292,30 +293,38 @@ def dcp_section(start, end=None, shift=None):
     }
 
 
-def pa_section(start, end=None, shift=None):
+def packing_section(factory, start, end=None, shift=None):
+    """تجميع جدول تعبئة ديناميكي (PA أو SA): عمود لكل نوع + صف قيم + الإجمالي."""
     start, end = _normalize_range(start, end)
-    qs = PALineItem.objects.filter(
-        shift_entry__unit="PA", shift_entry__entry_date__range=(start, end)
+    types = list(
+        PackingType.objects.filter(factory=factory, is_active=True).order_by("order", "id")
+    )
+    qs = PackingLineItem.objects.filter(
+        shift_entry__unit=factory,
+        shift_entry__entry_date__range=(start, end),
     )
     if shift:
         qs = qs.filter(shift_entry__shift=shift)
-    agg = qs.aggregate(
-        jc_43=Sum("jc_43"), jc_62=Sum("jc_62"), cube_43=Sum("cube_43"), cube_61=Sum("cube_61")
-    )
-    values = {k: v or ZERO for k, v in agg.items()}
-    values["total"] = values["jc_43"] + values["jc_62"] + values["cube_43"] + values["cube_61"]
-    return values
+    sums = {
+        r["packing_type_id"]: r["v"]
+        for r in qs.values("packing_type_id").annotate(v=Sum("value"))
+    }
+    columns, values = [], []
+    total = ZERO
+    for t in types:
+        v = sums.get(t.pk) or ZERO
+        columns.append(t.name)
+        values.append(v)
+        total += v
+    return {"columns": columns, "values": values, "total": total}
+
+
+def pa_section(start, end=None, shift=None):
+    return packing_section(PackingFactory.PA, start, end, shift)
 
 
 def sa_section(start, end=None, shift=None):
-    start, end = _normalize_range(start, end)
-    qs = SALineItem.objects.filter(
-        shift_entry__unit="SA", shift_entry__entry_date__range=(start, end)
-    )
-    if shift:
-        qs = qs.filter(shift_entry__shift=shift)
-    value = qs.aggregate(jc=Sum("jc"))["jc"] or ZERO
-    return {"jc": value}
+    return packing_section(PackingFactory.SA, start, end, shift)
 
 
 def gcc_section(start, end=None, shift=None):
@@ -414,7 +423,7 @@ def charts_data(start, end=None, shift=None):
                 float(gcc_section(start, end, shift)[1]["grand_total"]),
                 float(_dcp_sec["totals"]["total"]),
                 float(pa_section(start, end, shift)["total"]),
-                float(sa_section(start, end, shift)["jc"]),
+                float(sa_section(start, end, shift)["total"]),
             ],
         },
         "dcp": {

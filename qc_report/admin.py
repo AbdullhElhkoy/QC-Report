@@ -10,8 +10,8 @@ from .models import (
     EntryRevision,
     GCCLineItem,
     LoadingLineItem,
-    PALineItem,
-    SALineItem,
+    PackingLineItem,
+    PackingType,
     ShiftEntry,
     SOPLineItem,
     User,
@@ -78,6 +78,18 @@ class DCPTestsInline(admin.StackedInline):
     max_num = 1
 
 
+@admin.register(PackingType)
+class PackingTypeAdmin(admin.ModelAdmin):
+    list_display = ("factory", "name", "order", "is_active")
+    list_filter = ("factory", "is_active")
+    list_editable = ("order", "is_active")
+
+
+class PackingLineItemInline(admin.TabularInline):
+    model = PackingLineItem
+    extra = 0
+
+
 @admin.register(DCPReason)
 class DCPReasonAdmin(admin.ModelAdmin):
     list_display = ("name", "category", "order", "is_active")
@@ -86,13 +98,15 @@ class DCPReasonAdmin(admin.ModelAdmin):
 
 
 class PALineItemInline(admin.TabularInline):
-    model = PALineItem
+    model = PackingLineItem
     extra = 0
+    verbose_name = "بند PA"
 
 
 class SALineItemInline(admin.TabularInline):
-    model = SALineItem
+    model = PackingLineItem
     extra = 0
+    verbose_name = "بند SA"
 
 
 class GCCLineItemInline(admin.TabularInline):
@@ -140,10 +154,8 @@ class ShiftEntryAdmin(admin.ModelAdmin):
             return inlines
         if unit == "DCP":
             return [DCPBBRowInline, DCPSBRowInline, DCPASRowInline, DCPTestsInline]
-        if unit == "PA":
-            return [PALineItemInline]
-        if unit == "SA":
-            return [SALineItemInline]
+        if unit in ("PA", "SA"):
+            return [PackingLineItemInline]
         if unit in ("GCC1", "GCC2"):
             return [GCCLineItemInline]
         if unit == "LOADING":

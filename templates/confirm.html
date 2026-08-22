@@ -40,21 +40,31 @@
       </ul>
     {% endif %}
 
-    {% if pa_items %}
-      <h6>PA</h6>
-      <ul class="list-inline">
-        {% for i in pa_items %}
-          <li class="list-inline-item me-3">JC 43: {{ i.jc_43 }}</li>
-          <li class="list-inline-item me-3">JC 62: {{ i.jc_62 }}</li>
-          <li class="list-inline-item me-3">Cube 43: {{ i.cube_43 }}</li>
-          <li class="list-inline-item me-3">Cube 61: {{ i.cube_61 }}</li>
-        {% endfor %}
-      </ul>
-    {% endif %}
-
-    {% if sa_items %}
-      <h6>SA</h6>
-      {% for i in sa_items %}<p>JC: {{ i.jc }}</p>{% endfor %}
+    {% if pa_items or sa_items %}
+      <div class="row">
+        <div class="col-12 col-md-6">
+          <h6>PA</h6>
+          <table class="table table-bordered text-center align-middle table-sm" style="border:1px solid #8a8a8a;">
+            <thead style="background:#D9EAD3;">
+              <tr>{% for i in pa_items %}<th>{{ i.packing_type.name }}</th>{% endfor %}</tr>
+            </thead>
+            <tbody>
+              <tr>{% for i in pa_items %}<td>{{ i.value }}</td>{% endfor %}</tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="col-12 col-md-6">
+          <h6>SA</h6>
+          <table class="table table-bordered text-center align-middle table-sm" style="border:1px solid #8a8a8a;">
+            <thead style="background:#D9EAD3;">
+              <tr>{% for i in sa_items %}<th>{{ i.packing_type.name }}</th>{% endfor %}</tr>
+            </thead>
+            <tbody>
+              <tr>{% for i in sa_items %}<td>{{ i.value }}</td>{% endfor %}</tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
     {% endif %}
 
     {% if gcc_items %}

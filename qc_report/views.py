@@ -22,11 +22,10 @@ from .forms import (
     DCPReasonLineForm,
     DCPTestsForm,
     DCPSBRowForm,
+    PackingTableForm,
     build_dcp_reason_line_form,
     GCCLineItemForm,
     LoadingLineItemForm,
-    PALineItemForm,
-    SALineItemForm,
     ShiftEntryForm,
     SOPLineItemForm,
 )
@@ -42,10 +41,11 @@ from .models import (
     GCCLineItem,
     LoadingLineItem,
     LoadingProductType,
-    PALineItem,
+    PackingFactory,
+    PackingLineItem,
+    PackingType,
     PackageType,
     ProductType,
-    SALineItem,
     EntryRevision,
     Shift,
     ShiftEntry,
@@ -67,7 +67,7 @@ MODEL_TITLES = {
     "DCPRework": "التدوير",
     "PALineItem": "بنود PA",
     "SALineItem": "بنود SA",
-    "GCCLineItem": "بنود GCC",
+    "PackingLineItem": "بنود التعبئة (PA/SA)",    "GCCLineItem": "بنود GCC",
     "LoadingLineItem": "بنود التحميل",
     "BulkLog": "عربيات BULK",
     "DCPBBRow": "جدول B.B",
@@ -90,6 +90,7 @@ _SNAPSHOT_RELATED = [
     ("dcp_tests", ["lab_test", "floor_test"]),
     ("pa_line_items", ["jc_43", "jc_62", "cube_43", "cube_61"]),
     ("sa_line_items", ["jc"]),
+    ("packing_items", ["packing_type", "value"]),
     ("gcc_line_items", ["package_type", "green", "yellow", "white", "blue", "nc", "defect_reason", "notes"]),
     ("loading_line_items", ["product_type", "exp", "dom"]),
 ]
@@ -113,10 +114,19 @@ def snapshot_entry(entry):
         "shift": entry.shift,
     }
     for name, fields in _SNAPSHOT_RELATED:
-        if name in ("sop_line_items", "pa_line_items", "sa_line_items", "gcc_line_items", "loading_line_items"):
+        if name in ("sop_line_items", "gcc_line_items", "loading_line_items"):
             data[name] = [
                 {f: _jsonable(getattr(obj, f)) for f in fields}
                 for obj in getattr(entry, name).all()
+            ]
+        elif name == "packing_items":
+            data[name] = [
+                {
+                    "factory": li.packing_type.factory,
+                    "type": li.packing_type.name,
+                    "value": _jsonable(li.value),
+                }
+                for li in entry.packing_items.select_related("packing_type")
             ]
         else:
             obj = getattr(entry, name, None)
@@ -377,13 +387,42 @@ def _entry_template(unit):
         return SOP_UNIT_TEMPLATES[unit]
     templates = {
         "DCP": "entry_dcp.html",
-        "PA": "entry_pa.html",
-        "SA": "entry_sa.html",
+        "PA": "entry_packing.html",
+        "SA": "entry_packing.html",
         "GCC1": "entry_gcc.html",
         "GCC2": "entry_gcc.html",
         "LOADING": "entry_loading.html",
     }
     return templates[unit]
+
+
+def packing_sides(entry_date=None, shift=None, entry=None):
+    """قيم عرض جدولي PA/SA معاً: الأنواع + القيم المحفوظة (للعرض فقط)."""
+    sides = {}
+    for factory in ("PA", "SA"):
+        types = list(
+            PackingType.objects.filter(factory=factory, is_active=True).order_by(
+                "order", "id"
+            )
+        )
+        src = entry
+        if src is None and entry_date and shift:
+            src = ShiftEntry.objects.filter(
+                unit=factory, entry_date=entry_date, shift=shift
+            ).first()
+        values = (
+            {li.packing_type_id: li.value for li in src.packing_items.all()}
+            if src
+            else {}
+        )
+        total = sum((v for v in values.values()), ZERO)
+        sides[factory] = {
+            "types": types,
+            "values": values,
+            "total": total,
+            "label": dict(PackingFactory.choices)[factory],
+        }
+    return sides
 
 
 def _build_all_forms(unit, data=None, entry=None):
@@ -393,6 +432,8 @@ def _build_all_forms(unit, data=None, entry=None):
         "dcp": None,
         "pa_form": None,
         "sa_form": None,
+        "pa_table": None,
+        "sa_table": None,
         "bulk_form": None,
     }
     if unit in SOP_UNIT_TEMPLATES:
@@ -406,12 +447,15 @@ def _build_all_forms(unit, data=None, entry=None):
         ctx["rows"] = build_loading_rows(data, entry)
     elif unit == "DCP":
         ctx["dcp"] = build_dcp_forms(data, entry)
-    elif unit == "PA":
-        instance = _first(entry.pa_line_items.all()) if entry is not None else None
-        ctx["pa_form"] = PALineItemForm(data, instance=instance, prefix="pa")
-    elif unit == "SA":
-        instance = _first(entry.sa_line_items.all()) if entry is not None else None
-        ctx["sa_form"] = SALineItemForm(data, instance=instance, prefix="sa")
+    elif unit in ("PA", "SA"):
+        ctx["pa_table"] = PackingTableForm(
+            PackingFactory.PA, data=data,
+            entry=entry if entry is not None else None, prefix="pa",
+        )
+        ctx["sa_table"] = PackingTableForm(
+            PackingFactory.SA, data=data,
+            entry=entry if entry is not None else None, prefix="sa",
+        )
     return ctx
 
 
@@ -430,6 +474,10 @@ def _flatten_forms(ctx):
         forms.append(ctx["pa_form"])
     if ctx["sa_form"]:
         forms.append(ctx["sa_form"])
+    if ctx.get("pa_table"):
+        forms.append(ctx["pa_table"])
+    if ctx.get("sa_table"):
+        forms.append(ctx["sa_table"])
     return forms
 
 
@@ -451,22 +499,19 @@ def _save_related(entry, data):
         save_loading_rows(entry, data)
     elif unit == "DCP":
         save_dcp_forms(entry, data)
-    elif unit == "PA":
-        form = PALineItemForm(
-            data, instance=entry.pa_line_items.first(), prefix="pa"
-        )
-        if form.is_valid():
-            obj = form.save(commit=False)
-            obj.shift_entry = entry
-            obj.save()
-    elif unit == "SA":
-        form = SALineItemForm(
-            data, instance=entry.sa_line_items.first(), prefix="sa"
-        )
-        if form.is_valid():
-            obj = form.save(commit=False)
-            obj.shift_entry = entry
-            obj.save()
+    elif unit in ("PA", "SA"):
+        for factory, prefix in ((PackingFactory.PA, "pa"), (PackingFactory.SA, "sa")):
+            table = PackingTableForm(factory, data=data, prefix=prefix)
+            if not table.is_valid():
+                raise ValidationError("بيانات %s غير صحيحة." % factory)
+            cleaned = table.cleaned_data
+            for t in table.types:
+                value = cleaned.get(f"type_{t.pk}") or 0
+                PackingLineItem.objects.update_or_create(
+                    shift_entry=entry,
+                    packing_type=t,
+                    defaults={"value": value},
+                )
 
 
 @login_required
@@ -529,6 +574,7 @@ def entry_new(request, unit):
             "entries_today": entries_today,
             "existing_shifts": existing_shifts,
             "has_bulk": unit in SOP_BULK_UNITS,
+            "pack_sides": packing_sides(today, next_shift) if unit in ("PA", "SA") else None,
             **header_context(request, unit),
             **ctx,
         },
@@ -581,6 +627,7 @@ def entry_edit(request, unit, entry_date, shift):
             "entry": entry,
             "today": timezone.localdate(),
             "has_bulk": unit in SOP_BULK_UNITS,
+            "pack_sides": packing_sides(entry=entry) if unit in ("PA", "SA") else None,
             **header_context(request, unit, entry=entry),
             **ctx,
         },
@@ -605,10 +652,10 @@ def entry_summary_context(entry):
         ctx["dcp_nc_lines"] = entry.dcp_reason_lines.filter(
             reason__category="NC"
         ).select_related("reason")
-    elif unit == "PA":
-        ctx["pa_items"] = entry.pa_line_items.all()
-    elif unit == "SA":
-        ctx["sa_items"] = entry.sa_line_items.all()
+    elif unit in ("PA", "SA"):
+        items = entry.packing_items.select_related("packing_type")
+        ctx["pa_items"] = [i for i in items if i.packing_type.factory == "PA"]
+        ctx["sa_items"] = [i for i in items if i.packing_type.factory == "SA"]
     elif unit in ("GCC1", "GCC2"):
         ctx["gcc_items"] = entry.gcc_line_items.all()
     elif unit == "LOADING":
@@ -700,8 +747,9 @@ _REVISION_TITLES = [
     ("dcp_sb", "جدول S.B"),
     ("dcp_as", "جدول S.B AS"),
     ("dcp_tests", "الاختبارات"),
-    ("pa_line_items", "بنود PA"),
-    ("sa_line_items", "بنود SA"),
+    ("pa_line_items", "بنود PA (قديم)"),
+    ("sa_line_items", "بنود SA (قديم)"),
+    ("packing_items", "بنود التعبئة (PA/SA)"),
     ("gcc_line_items", "بنود GCC"),
     ("loading_line_items", "بنود التحميل"),
     ("dcp_reason_lines", "أسباب الأبيض والأحمر"),

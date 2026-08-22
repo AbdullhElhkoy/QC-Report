@@ -279,25 +279,35 @@
 {% endif %}
 
 <h5>PA / SA</h5>
-<div class="table-responsive mb-4">
-  <table class="table table-bordered text-center align-middle bg-white">
-    <tbody>
-      <tr>
-        <th class="table-light">PA JC 43</th><td>{{ pa.jc_43 }}</td>
-        <th class="table-light">PA JC 62</th><td>{{ pa.jc_62 }}</td>
-        <th class="table-light">PA Cube 43</th><td>{{ pa.cube_43 }}</td>
-        <th class="table-light">PA Cube 61</th><td>{{ pa.cube_61 }}</td>
-        <th class="table-light">PA Total</th><td>{{ pa.total }}</td>
-      </tr>
-      <tr>
-        <th class="table-light">SA JC</th><td>{{ sa.jc }}</td>
-        <th class="table-light"></th><td></td>
-        <th class="table-light"></th><td></td>
-        <th class="table-light"></th><td></td>
-        <th class="table-light"></th><td></td>
-      </tr>
-    </tbody>
-  </table>
+<div class="row mb-4">
+  <div class="col-12 col-lg-6">
+    <table class="table table-bordered text-center align-middle bg-white mb-2" style="border:1px solid #8a8a8a;">
+      <thead style="background:#D9EAD3;">
+        <tr><th>PA</th>{% for c in pa.columns %}<th>{{ c }}</th>{% endfor %}<th>Total</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="table-light fw-bold">Qty</td>
+          {% for v in pa.values %}<td>{{ v }}</td>{% endfor %}
+          <td class="fw-bold">{{ pa.total }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="col-12 col-lg-6">
+    <table class="table table-bordered text-center align-middle bg-white" style="border:1px solid #8a8a8a;">
+      <thead style="background:#D9EAD3;">
+        <tr><th>SA</th>{% for c in sa.columns %}<th>{{ c }}</th>{% endfor %}<th>Total</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="table-light fw-bold">Qty</td>
+          {% for v in sa.values %}<td>{{ v }}</td>{% endfor %}
+          <td class="fw-bold">{{ sa.total }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <h5>GCC</h5>

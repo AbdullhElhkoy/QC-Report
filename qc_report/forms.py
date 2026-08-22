@@ -10,8 +10,7 @@ from .models import (
     DCPSBRow,
     GCCLineItem,
     LoadingLineItem,
-    PALineItem,
-    SALineItem,
+    PackingType,
     ShiftEntry,
     SOPLineItem,
 )
@@ -151,20 +150,50 @@ class DCPReasonLineForm(forms.ModelForm):
         }
 
 
-class PALineItemForm(ZeroDefaultMixin, forms.ModelForm):
-    zero_fields = ("jc_43", "jc_62", "cube_43", "cube_61")
+class PackingTableForm(forms.Form):
+    """جدول ديناميكي لأنواع التعبئة — الحقول بتتبني حسب الأنواع المسجلة في الإعدادات.
 
-    class Meta:
-        model = PALineItem
-        fields = ["jc_43", "jc_62", "cube_43", "cube_61"]
+    بيتبنى لوحدة معينة (PA أو SA): خانة تحت كل نوع تعبئة، افتراضيها صفر.
+    """
 
+    def __init__(self, factory, data=None, entry=None, prefix="pack"):
+        super().__init__(data=data, prefix=prefix)
+        self.factory = factory
+        self.types = list(
+            PackingType.objects.filter(factory=factory, is_active=True).order_by(
+                "order", "id"
+            )
+        )
+        saved = {}
+        if entry is not None:
+            saved = {
+                li.packing_type_id: li.value
+                for li in entry.packing_items.filter(packing_type__factory=factory)
+            }
+        for t in self.types:
+            self.fields[f"type_{t.pk}"] = forms.DecimalField(
+                required=False,
+                min_value=0,
+                max_digits=10,
+                decimal_places=2,
+                initial=saved.get(t.pk),
+                label=t.name,
+                widget=forms.NumberInput(
+                    attrs={
+                        "type": "number",
+                        "step": "any",
+                        "min": "0",
+                        "class": "form-control form-control-sm text-center pack-input",
+                    }
+                ),
+            )
 
-class SALineItemForm(ZeroDefaultMixin, forms.ModelForm):
-    zero_fields = ("jc",)
-
-    class Meta:
-        model = SALineItem
-        fields = ["jc"]
+    def clean(self):
+        cleaned = super().clean()
+        for name, value in list(cleaned.items()):
+            if value is None:
+                cleaned[name] = 0
+        return cleaned
 
 
 class GCCLineItemForm(ZeroDefaultMixin, forms.ModelForm):

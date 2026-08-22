@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}{{ unit_label }} — إدخال بيانات{% endblock %}
+{% block content %}
+<style>
+  .packing-table { width: 100%; border-collapse: collapse; }
+  .packing-table th, .packing-table td {
+    border: 1px solid #8a8a8a; text-align: center; vertical-align: middle;
+    padding: 0.45rem 0.3rem;
+  }
+  .packing-table thead th { background: #D9EAD3; color: #274E13; font-weight: 600; }
+  .packing-table .row-label { background: #f3f6f1; width: 70px; font-weight: 600; }
+  .packing-table td input.pack-input { width: 90px; margin: 0 auto; }
+  .packing-table tfoot th { background: #D9EAD3; color: #274E13; }
+</style>
+
+<h3 class="mb-1">PA &amp; SA</h3>
+<p class="text-muted">إدخال بيانات الوردية</p>
+
+<form method="post">
+  {% csrf_token %}
+  {% include "partials/shift_fields.html" %}
+
+  <div class="row g-3 align-items-start">
+    {# ================= جدول PA (يسار) ================= #}
+    <div class="col-12 col-lg-6">
+      <table class="packing-table" id="paTable">
+        <thead>
+          <tr>
+            <th class="row-label">PA</th>
+            {% for f in pa_table.types %}
+              <th>{{ f.name }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="row-label"></td>
+            {% if unit == 'PA' %}
+              {% for field in pa_table %}
+                <td>{{ field }}<small class="text-danger d-block">{{ field.errors }}</small></td>
+              {% endfor %}
+            {% else %}
+              {% for t in pack_sides.PA.types %}
+                <td data-type-id="{{ t.pk }}">
+                  {% with vals=pack_sides.PA.values %}{% for vid, v in vals.items %}{% if vid == t.pk %}{{ v }}{% endif %}{% endfor %}{% endwith %}
+                </td>
+              {% endfor %}
+            {% endif %}
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <th class="row-label">TOTAL</th>
+            {% if unit == 'PA' %}
+              <th colspan="{{ pa_table.types|length }}" id="paTotal">0</th>
+            {% else %}
+              <th colspan="{{ pack_sides.PA.types|length }}">{{ pack_sides.PA.total }}</th>
+            {% endif %}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+
+    {# ================= جدول SA (يمين) ================= #}
+    <div class="col-12 col-lg-6">
+      <table class="packing-table" id="saTable">
+        <thead>
+          <tr>
+            <th class="row-label">SA</th>
+            {% for f in sa_table.types %}
+              <th>{{ f.name }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="row-label"></td>
+            {% if unit == 'SA' %}
+              {% for field in sa_table %}
+                <td>{{ field }}<small class="text-danger d-block">{{ field.errors }}</small></td>
+              {% endfor %}
+            {% else %}
+              {% for t in pack_sides.SA.types %}
+                <td data-type-id="{{ t.pk }}">
+                  {% with vals=pack_sides.SA.values %}{% for vid, v in vals.items %}{% if vid == t.pk %}{{ v }}{% endif %}{% endfor %}{% endwith %}
+                </td>
+              {% endfor %}
+            {% endif %}
+          </tr>
+        </tbody>
+        <tfoot>
+          <tr>
+            <th class="row-label">TOTAL</th>
+            {% if unit == 'SA' %}
+              <th colspan="{{ sa_table.types|length }}" id="saTotal">0</th>
+            {% else %}
+              <th colspan="{{ pack_sides.SA.types|length }}">{{ pack_sides.SA.total }}</th>
+            {% endif %}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <button type="submit" class="btn btn-primary btn-lg mt-4">حفظ</button>
+  <a href="{% url 'dashboard' %}" class="btn btn-outline-secondary mt-4">إلغاء</a>
+</form>
+
+<script>
+  function sumPacking(tableId, targetId) {
+    var total = 0;
+    document.querySelectorAll("#" + tableId + " input.pack-input").forEach(function (i) {
+      total += parseFloat(i.value) || 0;
+    });
+    document.getElementById(targetId).textContent = total;
+  }
+  [["paTable", "paTotal"], ["saTable", "saTotal"]].forEach(function (cfg) {
+    var t = document.getElementById(cfg[0]);
+    if (!t) return;
+    var handler = function () { sumPacking(cfg[0], cfg[1]); };
+    t.addEventListener("input", handler);
+    if (t.querySelector("input.pack-input")) handler();
+  });
+</script>
+{% endblock %}
