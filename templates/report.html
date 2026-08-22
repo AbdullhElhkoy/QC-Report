@@ -1,24 +1,42 @@
 {% extends "base.html" %}
-{% block title %}التقرير اليومي — {{ period_label }}{% endblock %}
+{% block navbar %}
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary no-print">
+  <div class="container-fluid">
+    <a class="navbar-brand" href="{% url 'dashboard' %}">QC Report</a>
+    <ul class="navbar-nav me-auto">
+      <li class="nav-item"><a class="nav-link" href="{% url 'records' %}">Records</a></li>
+      <li class="nav-item"><a class="nav-link" href="{% url 'report_today' %}">Daily Report</a></li>
+    </ul>
+    {% if user.is_authenticated %}
+      <span class="navbar-text text-white me-3">{{ user.username }}</span>
+      <form method="post" action="{% url 'logout' %}" class="d-inline">
+        {% csrf_token %}
+        <button class="btn btn-outline-light btn-sm" type="submit">Logout</button>
+      </form>
+    {% endif %}
+  </div>
+</nav>
+{% endblock %}
+{% block title %}QC Report — {{ period_label }}{% endblock %}
 {% block content %}
 <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 no-print">
-  <h3 class="mb-0">التقرير — {{ period_label }}</h3>
+  <h3 class="mb-0">QC Report — {{ period_label }}</h3>
   <div>
     {% if prev_date %}
-      <a href="{% url 'report' prev_date %}" class="btn btn-outline-secondary btn-sm">اليوم السابق</a>
+      <a href="{% url 'report' prev_date %}" class="btn btn-outline-secondary btn-sm">Previous Day</a>
     {% endif %}
     <form method="get" action="" class="d-inline">
-      <label class="small text-muted ms-1">من</label>
+      <label class="small text-muted ms-1">From</label>
       <input type="date" id="dateFrom" value="{{ date_from|date:'Y-m-d' }}" class="form-control form-control-sm d-inline-block w-auto">
-      <label class="small text-muted ms-1">إلى</label>
+      <label class="small text-muted ms-1">To</label>
       <input type="date" id="dateTo" value="{{ date_to|date:'Y-m-d' }}" class="form-control form-control-sm d-inline-block w-auto">
       <button type="button" class="btn btn-outline-primary btn-sm"
-              onclick="location.href='/report/' + document.getElementById('dateFrom').value + '/' + document.getElementById('dateTo').value + '/'">عرض الفترة</button>
+              onclick="location.href='/report/' + document.getElementById('dateFrom').value + '/' + document.getElementById('dateTo').value + '/'">Show</button>
     </form>
     {% if next_date %}
-      <a href="{% url 'report' next_date %}" class="btn btn-outline-secondary btn-sm">اليوم التالي</a>
+      <a href="{% url 'report' next_date %}" class="btn btn-outline-secondary btn-sm">Next Day</a>
     {% endif %}
-    <a href="{% url 'report_pdf_range' date_from date_to %}" class="btn btn-dark btn-sm" target="_blank">تصدير PDF</a>
+    <a href="{% url 'report_pdf_range' date_from date_to %}" class="btn btn-dark btn-sm" target="_blank">Export PDF</a>
   </div>
 </div>
 
@@ -26,7 +44,7 @@
 <div class="table-responsive mb-2">
   <table class="table table-bordered text-center align-middle bg-white">
     <thead class="table-light">
-      <tr><th>الوحدة</th><th>المنتج</th><th>EXP</th><th>DOM</th><th>STD</th><th>NC</th><th>Cause & Note</th><th>TOTAL</th></tr>
+      <tr><th>Unit</th><th>Product</th><th>EXP</th><th>DOM</th><th>STD</th><th>NC</th><th>Cause & Note</th><th>TOTAL</th></tr>
     </thead>
     <tbody>
       {% for unit_row in sop.rows %}
@@ -73,16 +91,16 @@
         <th class="table-light">TOTAL (2)</th><td>{{ dcp.summary.total_2 }}</td>
       </tr>
       <tr>
-        <th class="table-light">اختبار معمل</th><td>{{ dcp.summary.lab_test_count }}</td>
-        <th class="table-light">اختبار امس</th><td>{{ dcp.summary.yesterday_test_count }}</td>
-        <th class="table-light">تحت الاختبار</th><td>{{ dcp.under_test }}</td>
+        <th class="table-light">Lab Tests</th><td>{{ dcp.summary.lab_test_count }}</td>
+        <th class="table-light">Yesterday's Tests</th><td>{{ dcp.summary.yesterday_test_count }}</td>
+        <th class="table-light">Under Test</th><td>{{ dcp.under_test }}</td>
         <th class="table-light"></th><td></td>
       </tr>
     </tbody>
   </table>
   <table class="table table-bordered text-center align-middle bg-white">
     <thead class="table-light">
-      <tr><th>الفئة</th><th>أخضر</th><th>أصفر</th><th>أخضر وأصفر</th><th>أزرق</th><th>أبيض</th><th>أحمر</th><th>الإجمالي</th></tr>
+      <tr><th>Category</th><th>Green</th><th>Yellow</th><th>Green & Yellow</th><th>Blue</th><th>White</th><th>Red</th><th>Total</th></tr>
     </thead>
     <tbody>
       {% for c in dcp.categories %}
@@ -106,10 +124,10 @@
         <th class="table-light">NC</th><td>{{ dcp.white_quality.nc_count }}</td>
       </tr>
       <tr>
-        <th class="table-light">التدوير اجمالي</th><td>{{ dcp.rework.total }}</td>
-        <th class="table-light">اخضر واصفر</th><td>{{ dcp.rework.green_yellow }}</td>
-        <th class="table-light">اصفر</th><td>{{ dcp.rework.yellow }}</td>
-        <th class="table-light">اخضر</th><td>{{ dcp.rework.green }}</td>
+        <th class="table-light">Rework Total</th><td>{{ dcp.rework.total }}</td>
+        <th class="table-light">Green & Yellow</th><td>{{ dcp.rework.green_yellow }}</td>
+        <th class="table-light">Yellow</th><td>{{ dcp.rework.yellow }}</td>
+        <th class="table-light">Green</th><td>{{ dcp.rework.green }}</td>
       </tr>
     </tbody>
   </table>
@@ -127,7 +145,7 @@
         <th class="table-light">PA JC 62</th><td>{{ pa.jc_62 }}</td>
         <th class="table-light">PA Cube 43</th><td>{{ pa.cube_43 }}</td>
         <th class="table-light">PA Cube 61</th><td>{{ pa.cube_61 }}</td>
-        <th class="table-light">PA الإجمالي</th><td>{{ pa.total }}</td>
+        <th class="table-light">PA Total</th><td>{{ pa.total }}</td>
       </tr>
       <tr>
         <th class="table-light">SA JC</th><td>{{ sa.jc }}</td>
@@ -144,7 +162,7 @@
 <div class="table-responsive mb-4">
   <table class="table table-bordered text-center align-middle bg-white">
     <thead class="table-light">
-      <tr><th>الوحدة</th><th>نوع العبوة</th><th>أخضر</th><th>أصفر</th><th>أبيض</th><th>أزرق</th><th>NC</th><th>الإجمالي</th></tr>
+      <tr><th>Unit</th><th>Package</th><th>Green</th><th>Yellow</th><th>White</th><th>Blue</th><th>NC</th><th>Total</th></tr>
     </thead>
     <tbody>
       {% for g in gcc %}
@@ -157,7 +175,7 @@
           </tr>
         {% endfor %}
         <tr class="table-secondary fw-bold">
-          <td colspan="7">إجمالي {{ g.unit }}</td>
+          <td colspan="7">Total {{ g.unit }}</td>
           <td>{{ g.grand_total }}</td>
         </tr>
       {% endfor %}
@@ -169,7 +187,7 @@
 <div class="table-responsive mb-4">
   <table class="table table-bordered text-center align-middle bg-white">
     <thead class="table-light">
-      <tr><th>نوع المنتج</th><th>EXP</th><th>DOM</th><th>الإجمالي</th></tr>
+      <tr><th>Product</th><th>EXP</th><th>DOM</th><th>Total</th></tr>
     </thead>
     <tbody>
       {% for r in loading.rows %}
@@ -179,14 +197,14 @@
         </tr>
       {% endfor %}
       <tr class="table-secondary fw-bold">
-        <td colspan="3">الإجمالي العام</td>
+        <td colspan="3">Grand Total</td>
         <td>{{ loading.grand_total }}</td>
       </tr>
     </tbody>
   </table>
 </div>
 
-<h5 class="no-print">الرسوم البيانية</h5>
+<h5 class="no-print">Charts</h5>
 <div class="row g-4 mb-4 no-print">
   <div class="col-12 col-lg-6"><div class="card"><div class="card-body"><canvas id="chartTotalQty"></canvas></div></div></div>
   <div class="col-12 col-lg-6"><div class="card"><div class="card-body"><canvas id="chartDcp"></canvas></div></div></div>

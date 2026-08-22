@@ -21,8 +21,8 @@
         direction: rtl;
     }
 
-    /* الجداول بتتبنى بترتيب أعمدة إنجليزي (زي التصميم الأصلي)
-       حتى لو باقي الصفحة RTL، فبنقفل اتجاهها LTR بشكل صريح */
+    /* Tables are laid out with English column order (like the original design)
+       even if the page stays RTL, so we force LTR explicitly */
     .ltr-table { direction: ltr; }
     .ltr-table th, .ltr-table td { text-align: center; }
 
@@ -74,7 +74,7 @@
         padding: 2px 4px;
     }
 
-    /* الفوتر الثابت المتكرر في كل صفحة */
+    /* Fixed footer repeated on every page */
     #footer {
         position: running(footer);
         width: 100%;
@@ -100,10 +100,9 @@
 
 <div id="footer">
     <span>{{ doc_control.form_number }}</span>
-    <span>صفحة (<span class="page-counter"></span>)</span>
-    <span>تاريخ التعديل: {{ doc_control.revision_date }}</span>
-    <span>ت. الإصدار: {{ doc_control.revision_date }}</span>
-    <span>إصدار / تعديل رقم: {{ doc_control.revision_no }}</span>
+    <span>Page (<span class="page-counter"></span>)</span>
+    <span>Revision Date: {{ doc_control.revision_date }}</span>
+    <span>Rev. No: {{ doc_control.revision_no }}</span>
 </div>
 
 <div class="header">
@@ -172,7 +171,7 @@
         <tr class="th-blue">
             <th rowspan="2">DCP</th>
             <th>B.B</th><th>AS S.B</th><th>TOTAL</th><th>TOTAL</th>
-            <th colspan="2">اختبار معمل / امس</th>
+            <th colspan="2">Lab Tests / Yesterday</th>
         </tr>
     </thead>
     <tbody>
@@ -211,7 +210,7 @@
     <thead>
         <tr class="th-yellow">
             <th>Under Test</th><th>DCP WHITE - IM</th><th>OVER</th><th>COLOR</th>
-            <th>P2O5</th><th>MC</th><th>NC</th><th>NOTES / التدوير</th>
+            <th>P2O5</th><th>MC</th><th>NC</th><th>NOTES / REWORK</th>
         </tr>
     </thead>
     <tbody>
@@ -224,10 +223,10 @@
             <td>{{ dcp.white_quality.mc }}</td>
             <td class="cell-nc">{{ dcp.white_quality.nc_count }}</td>
             <td>
-                إجمالي: {{ dcp.rework.total }} —
-                اخضر واصفر: {{ dcp.rework.green_yellow }} —
-                اصفر: {{ dcp.rework.yellow }} —
-                اخضر: {{ dcp.rework.green }}
+                Total: {{ dcp.rework.total }} —
+                Green &amp; Yellow: {{ dcp.rework.green_yellow }} —
+                Yellow: {{ dcp.rework.yellow }} —
+                Green: {{ dcp.rework.green }}
             </td>
         </tr>
     </tbody>
@@ -312,7 +311,7 @@
         <tr>
             <td class="th-grey" style="width:20%;">NOTES</td>
             <td></td>
-            <td class="th-grey" style="width:20%;">الطاحونه مطابق</td>
+            <td class="th-grey" style="width:20%;">Mill Conformity</td>
         </tr>
     </tbody>
 </table>
@@ -320,7 +319,7 @@
 </div> <!-- /.ltr-table -->
 {% endlocalize %}
 
-<!-- ============ صفحة الرسوم البيانية ============ -->
+<!-- ==================== Charts page ==================== -->
 <div class="page-break charts-page">
     <div class="charts-grid">
         <img src="data:image/png;base64,{{ charts.total_qty }}">

@@ -48,7 +48,7 @@ class LoadingProductType(models.TextChoices):
 
 
 class ColorGradingCategory(models.TextChoices):
-    TOTAL = "TOTAL", "الإجمالي"
+    TOTAL = "TOTAL", "Total"
     EX_SB = "EX_SB", "EX S.B"
     DOM_SB = "DOM_SB", "DOM S.B"
     SB_WHITE = "SB_WHITE", "S.B White"

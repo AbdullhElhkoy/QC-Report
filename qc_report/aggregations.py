@@ -295,7 +295,7 @@ def charts_data(start, end=None):
             ],
         },
         "dcp": {
-            "labels": ["أخضر", "أصفر", "أخضر وأصفر", "أزرق", "أبيض", "أحمر"],
+            "labels": ["Green", "Yellow", "G + Y", "Blue", "White", "Red"],
             "values": [
                 dcp_chart["green"],
                 dcp_chart["yellow"],
@@ -309,14 +309,14 @@ def charts_data(start, end=None):
         },
         "gcc": {
             "labels": [
-                "GCC1 أخضر",
-                "GCC1 أصفر",
-                "GCC1 أبيض",
-                "GCC1 أزرق",
-                "GCC2 أخضر",
-                "GCC2 أصفر",
-                "GCC2 أبيض",
-                "GCC2 أزرق",
+                "GCC1 Green",
+                "GCC1 Yellow",
+                "GCC1 White",
+                "GCC1 Blue",
+                "GCC2 Green",
+                "GCC2 Yellow",
+                "GCC2 White",
+                "GCC2 Blue",
             ],
             "values": [
                 gcc_colors("GCC1")["green"],
