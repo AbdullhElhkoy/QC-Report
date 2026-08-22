@@ -11,8 +11,9 @@ from django.http import Http404, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 
-from .aggregations import full_daily_report
+from .aggregations import full_daily_report, full_shift_report
 from .pdf_charts import generate_report_charts
 from .forms import (
     BulkLogForm,
@@ -45,6 +46,7 @@ from .models import (
     PackageType,
     ProductType,
     SALineItem,
+    EntryRevision,
     Shift,
     ShiftEntry,
     SOPLineItem,
@@ -74,6 +76,60 @@ MODEL_TITLES = {
     "DCPTests": "الاختبارات",
     "DCPReasonLine": "أسباب الأبيض والأحمر",
 }
+
+# حقول كل جدول بيتم التقاطها في نسخة سجل التعديل
+_SNAPSHOT_RELATED = [
+    ("sop_line_items", [
+        "product_type", "exp", "dom", "std", "nc", "cause", "note",
+        "defect_reason", "notes", "car_number", "car_weight",
+    ]),
+    ("bulk_log", ["exp_trucks", "dom_trucks", "std_trucks", "nc_trucks"]),
+    ("dcp_bb", ["green", "yellow", "green_yellow", "blue", "white", "red", "note"]),
+    ("dcp_sb", ["exp", "dom", "sb_white", "note"]),
+    ("dcp_as", ["exp", "dom", "sb_white", "note"]),
+    ("dcp_tests", ["lab_test", "floor_test"]),
+    ("pa_line_items", ["jc_43", "jc_62", "cube_43", "cube_61"]),
+    ("sa_line_items", ["jc"]),
+    ("gcc_line_items", ["package_type", "green", "yellow", "white", "blue", "nc", "defect_reason", "notes"]),
+    ("loading_line_items", ["product_type", "exp", "dom"]),
+]
+
+
+def _jsonable(v):
+    """Decimal والتواريخ مش بتتحول لـJSON تلقائياً."""
+    import datetime as _dt
+
+    if isinstance(v, Decimal) or isinstance(v, _dt.date):
+        return str(v)
+    return v
+
+
+def snapshot_entry(entry):
+    """نسخة كاملة من بيانات الإدخال الحالية (تتحفظ في سجل التعديل قبل أي تغيير)."""
+    data = {
+        "general_notes": entry.general_notes,
+        "unit": entry.unit,
+        "entry_date": str(entry.entry_date),
+        "shift": entry.shift,
+    }
+    for name, fields in _SNAPSHOT_RELATED:
+        if name in ("sop_line_items", "pa_line_items", "sa_line_items", "gcc_line_items", "loading_line_items"):
+            data[name] = [
+                {f: _jsonable(getattr(obj, f)) for f in fields}
+                for obj in getattr(entry, name).all()
+            ]
+        else:
+            obj = getattr(entry, name, None)
+            data[name] = (
+                {f: _jsonable(getattr(obj, f)) for f in fields} if obj else None
+            )
+    lines = []
+    for l in entry.dcp_reason_lines.select_related("reason"):
+        lines.append(
+            {"category": l.reason.category, "reason": l.reason.name, "qty": l.qty}
+        )
+    data["dcp_reason_lines"] = lines
+    return data
 
 # تسلسل الورديات المتكرر خلال اليوم: أول إدخال = الأولى، تاني = الثانية، تالت = الثالثة
 SHIFT_SEQUENCE = [Shift.SHIFT_1, Shift.SHIFT_2, Shift.SHIFT_3]
@@ -494,8 +550,14 @@ def entry_edit(request, unit, entry_date, shift):
         if all_row_forms_valid(_flatten_forms(ctx)):
             try:
                 with transaction.atomic():
+                    snapshot = snapshot_entry(entry)  # نسخة البيانات قبل التعديل
                     ctx["shift_form"].save()
                     _save_related(entry, request.POST)
+                    EntryRevision.objects.create(
+                        shift_entry=entry,
+                        edited_by=request.user,
+                        data=snapshot,
+                    )
                 messages.success(request, "تم تعديل الإدخال بنجاح.")
                 return redirect("entry_done", unit=unit, pk=entry.pk)
             except IntegrityError:
@@ -629,6 +691,86 @@ def daily_report_pdf(request, date_from=None, date_to=None):
         filename = f"QC_Report_{date_from.strftime('%d-%m-%Y')}.pdf"
     response["Content-Disposition"] = f'inline; filename="{filename}"'
     return response
+
+
+_REVISION_TITLES = [
+    ("sop_line_items", "بنود SOP"),
+    ("bulk_log", "عربيات BULK"),
+    ("dcp_bb", "جدول B.B"),
+    ("dcp_sb", "جدول S.B"),
+    ("dcp_as", "جدول S.B AS"),
+    ("dcp_tests", "الاختبارات"),
+    ("pa_line_items", "بنود PA"),
+    ("sa_line_items", "بنود SA"),
+    ("gcc_line_items", "بنود GCC"),
+    ("loading_line_items", "بنود التحميل"),
+    ("dcp_reason_lines", "أسباب الأبيض والأحمر"),
+]
+
+
+def _revision_sections(data):
+    """يحوّل نسخة JSON لجداول جاهزة للعرض: عنوان + رؤوس أعمدة + صفوف."""
+    sections = []
+    for key, title in _REVISION_TITLES:
+        rows = data.get(key)
+        if not rows:
+            continue
+        if isinstance(rows, dict):
+            rows = [rows]
+        header = [k.replace("_", " ").title() for k in rows[0]]
+        body = [[str(v) for v in r.values()] for r in rows]
+        sections.append({"title": title, "header": header, "rows": body})
+    return sections
+
+
+@login_required
+def entry_history(request, unit, pk):
+    get_unit_or_404(unit)
+    entry = get_object_or_404(ShiftEntry, pk=pk, unit=unit)
+    if not (request.user.is_manager or entry.submitted_by == request.user):
+        messages.error(request, "لا تملك صلاحية عرض سجل التعديلات.")
+        return redirect("dashboard")
+    history = [
+        {
+            "rev": rev,
+            "notes": rev.data.get("general_notes"),
+            "sections": _revision_sections(rev.data),
+        }
+        for rev in entry.revisions.select_related("edited_by")
+    ]
+    return render(
+        request,
+        "entry_history.html",
+        {"entry": entry, "unit_label": unit_label(unit), "history": history},
+    )
+
+
+@login_required
+def shift_report_picker(request):
+    """صفحة اختيار اليوم والوردية لتقرير الوردية لكل المصانع."""
+    if not request.user.is_manager:
+        messages.error(request, "تقارير متاحة للمدير فقط.")
+        return redirect("dashboard")
+    report_date = request.GET.get("date")
+    shift = request.GET.get("shift")
+    parsed = parse_date(report_date) if report_date else None
+    if parsed and shift in Shift.values:
+        return redirect("shift_report", parsed, shift)
+    return render(request, "shift_report_picker.html", {"today": timezone.localdate(), "shifts": Shift.choices})
+
+
+@login_required
+def shift_report(request, report_date, shift):
+    if not request.user.is_manager:
+        messages.error(request, "التقارير متاحة للمدير فقط.")
+        return redirect("dashboard")
+    if shift not in Shift.values:
+        raise Http404
+    context = full_shift_report(report_date, shift)
+    context["today"] = timezone.localdate()
+    context["prev_date"] = report_date - timezone.timedelta(days=1)
+    context["next_date"] = report_date + timezone.timedelta(days=1)
+    return render(request, "report_shift.html", context)
 
 
 def _format_field_value(field, value):

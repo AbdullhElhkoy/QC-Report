@@ -361,3 +361,29 @@ class LoadingLineItem(models.Model):
 
     def __str__(self):
         return f"{self.shift_entry} - {self.get_product_type_display()}"
+
+
+class EntryRevision(models.Model):
+    """سجل تعديل: بيحتفظ بنسخة كاملة من بيانات الإدخال قبل كل تعديل."""
+
+    shift_entry = models.ForeignKey(
+        ShiftEntry, on_delete=models.CASCADE, related_name="revisions"
+    )
+    edited_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        verbose_name="عدّلها",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="entry_revisions",
+    )
+    edited_at = models.DateTimeField("وقت التعديل", auto_now_add=True)
+    data = models.JSONField("البيانات قبل التعديل")
+
+    class Meta:
+        ordering = ["-edited_at"]
+        verbose_name = "سجل تعديل إدخال"
+        verbose_name_plural = "سجلات تعديل الإدخالات"
+
+    def __str__(self):
+        return f"تعديل {self.shift_entry} بتاريخ {self.edited_at:%Y-%m-%d %H:%M}"

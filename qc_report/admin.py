@@ -7,6 +7,7 @@ from .models import (
     DCPReason,
     DCPTests,
     DCPSBRow,
+    EntryRevision,
     GCCLineItem,
     LoadingLineItem,
     PALineItem,
@@ -104,6 +105,17 @@ class LoadingLineItemInline(admin.TabularInline):
     extra = 0
 
 
+class EntryRevisionInline(admin.TabularInline):
+    model = EntryRevision
+    extra = 0
+    max_num = 0
+    can_delete = False
+    fields = ("edited_by", "edited_at")
+    readonly_fields = ("edited_by", "edited_at")
+    verbose_name = "سجل تعديل"
+    verbose_name_plural = "سجلات التعديل (التفاصيل في صفحة السجل)"
+
+
 @admin.register(ShiftEntry)
 class ShiftEntryAdmin(admin.ModelAdmin):
     list_display = ("unit", "entry_date", "shift", "submitted_by", "submitted_at")
@@ -112,6 +124,12 @@ class ShiftEntryAdmin(admin.ModelAdmin):
     date_hierarchy = "entry_date"
 
     def get_inlines(self, request, obj):
+        base = self._unit_inlines(obj)
+        if obj is not None and obj.revisions.exists():
+            return base + [EntryRevisionInline]
+        return base
+
+    def _unit_inlines(self, obj):
         if obj is None:
             return []
         unit = obj.unit
@@ -121,12 +139,7 @@ class ShiftEntryAdmin(admin.ModelAdmin):
                 inlines.append(BulkLogInline)
             return inlines
         if unit == "DCP":
-            return [
-                DCPBBRowInline,
-                DCPSBRowInline,
-                DCPASRowInline,
-                DCPTestsInline,
-            ]
+            return [DCPBBRowInline, DCPSBRowInline, DCPASRowInline, DCPTestsInline]
         if unit == "PA":
             return [PALineItemInline]
         if unit == "SA":
@@ -136,6 +149,20 @@ class ShiftEntryAdmin(admin.ModelAdmin):
         if unit == "LOADING":
             return [LoadingLineItemInline]
         return []
+
+
+@admin.register(EntryRevision)
+class EntryRevisionAdmin(admin.ModelAdmin):
+    list_display = ("shift_entry", "edited_by", "edited_at")
+    list_filter = ("shift_entry__unit", "shift_entry__shift")
+    search_fields = ("shift_entry__unit",)
+    readonly_fields = ("shift_entry", "edited_by", "edited_at", "data")
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 admin.site.site_header = "QC Report - الإدارة"

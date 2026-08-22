@@ -18,27 +18,16 @@
   </div>
 </nav>
 {% endblock %}
-{% block title %}QC Report — {{ period_label }}{% endblock %}
-{% block content %}
-<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 no-print">
-  <h3 class="mb-0">QC Report — {{ period_label }}</h3>
+{% block title %}Shift Report — {{ period_label }}{% endblock %}
+{% block content %}<div class="d-flex flex-wrap justify-content-between align-items-center mb-3 no-print">
+  <h3 class="mb-0">Shift Report — {{ period_label }}</h3>
   <div>
-    {% if prev_date %}
-      <a href="{% url 'report' prev_date %}" class="btn btn-outline-secondary btn-sm">Previous Day</a>
-    {% endif %}
-    <form method="get" action="" class="d-inline">
-      <label class="small text-muted ms-1">From</label>
-      <input type="date" id="dateFrom" value="{{ date_from|date:'Y-m-d' }}" class="form-control form-control-sm d-inline-block w-auto">
-      <label class="small text-muted ms-1">To</label>
-      <input type="date" id="dateTo" value="{{ date_to|date:'Y-m-d' }}" class="form-control form-control-sm d-inline-block w-auto">
-      <button type="button" class="btn btn-outline-primary btn-sm"
-              onclick="location.href='/report/' + document.getElementById('dateFrom').value + '/' + document.getElementById('dateTo').value + '/'">Show</button>
-    </form>
-    {% if next_date %}
-      <a href="{% url 'report' next_date %}" class="btn btn-outline-secondary btn-sm">Next Day</a>
-    {% endif %}
-    <a href="{% url 'report_pdf_range' date_from date_to %}" class="btn btn-dark btn-sm" target="_blank">Export PDF</a>
+    <a href="{% url 'shift_report' prev_date shift %}" class="btn btn-outline-secondary btn-sm">Previous Day</a>
+    <a href="{% url 'shift_report' next_date shift %}" class="btn btn-outline-secondary btn-sm">Next Day</a>
+    <a href="{% url 'shift_report_picker' %}" class="btn btn-outline-primary btn-sm">Change Date / Shift</a>
+    <button type="button" class="btn btn-dark btn-sm" onclick="window.print()">Print</button>
   </div>
+</div>
 </div>
 
 <h5>SOP Units</h5>

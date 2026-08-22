@@ -96,6 +96,7 @@
   <a href="{% url 'entry_new' entry.unit %}" class="btn btn-primary">إدخال وردية أخرى</a>
   {% if can_edit %}
     <a href="{% url 'entry_edit' entry.unit entry.entry_date entry.shift %}" class="btn btn-outline-primary">تعديل هذا الإدخال</a>
+    <a href="{% url 'entry_history' entry.unit entry.pk %}" class="btn btn-outline-secondary">سجل التعديلات</a>
   {% endif %}
   {% if user.is_manager %}
     <a href="{% url 'report' entry.entry_date %}" class="btn btn-success">التقرير اليومي</a>

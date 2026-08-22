@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}سجل التعديلات — {{ unit_label }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+  <h3 class="mb-0">سجل التعديلات</h3>
+  <a href="{% url 'entry_done' entry.unit entry.pk %}" class="btn btn-outline-primary btn-sm">رجوع للإدخال</a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <p class="mb-1"><strong>الوحدة:</strong> {{ unit_label }}</p>
+    <p class="mb-1"><strong>التاريخ:</strong> {{ entry.entry_date }}</p>
+    <p class="mb-0"><strong>الوردية:</strong> {{ entry.get_shift_display }}</p>
+  </div>
+</div>
+
+{% for item in history %}
+  <div class="card mb-3">
+    <div class="card-header d-flex flex-wrap justify-content-between">
+      <span>نسخة قبل التعديل #{{ forloop.revcounter }}</span>
+      <small>بواسطة: {{ item.rev.edited_by|default:"—" }} | {{ item.rev.edited_at|date:'Y-m-d H:i' }}</small>
+    </div>
+    <div class="card-body">
+      {% if item.notes %}<p class="mb-2"><strong>ملاحظات عامة:</strong> {{ item.notes }}</p>{% endif %}
+      {% for sec in item.sections %}
+        <h6 class="mt-2">{{ sec.title }}</h6>
+        <div class="table-responsive">
+          <table class="table table-bordered text-center align-middle table-sm mb-2">
+            <thead class="table-light"><tr>{% for h in sec.header %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+            <tbody>
+              {% for row in sec.rows %}
+                <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+{% empty %}
+  <div class="alert alert-info">لا توجد تعديلات على هذا الإدخال.</div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}تقرير وردية{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-12 col-md-6 col-lg-5">
+    <div class="card">
+      <div class="card-header">تقرير وردية لكل المصانع</div>
+      <div class="card-body">
+        <form method="get" action="{% url 'shift_report_picker' %}">
+          <div class="mb-3">
+            <label class="form-label">التاريخ</label>
+            <input type="date" name="date" value="{{ today|date:'Y-m-d' }}" class="form-control" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">الوردية</label>
+            <select name="shift" class="form-select" required>
+              {% for value, label in shifts %}
+                <option value="{{ value }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary w-100">عرض التقرير</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

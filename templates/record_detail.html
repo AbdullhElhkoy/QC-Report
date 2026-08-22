@@ -8,6 +8,8 @@
     {% if can_edit %}
       <a href="{% url 'entry_edit' entry.unit entry.entry_date entry.shift %}"
          class="btn btn-primary btn-sm">تعديل</a>
+      <a href="{% url 'entry_history' entry.unit entry.pk %}"
+         class="btn btn-outline-secondary btn-sm">سجل التعديلات</a>
     {% endif %}
   </div>
 </div>
