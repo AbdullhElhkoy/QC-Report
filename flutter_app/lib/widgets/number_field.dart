@@ -8,6 +8,7 @@ class NumberField extends StatefulWidget {
   final TextEditingController controller;
   final bool allowDecimal;
   final int flex;
+  final bool dense;
 
   const NumberField({
     super.key,
@@ -15,6 +16,7 @@ class NumberField extends StatefulWidget {
     required this.controller,
     this.allowDecimal = false,
     this.flex = 1,
+    this.dense = false,
   });
 
   factory NumberField.zero({required String label, bool allowDecimal = false}) {
@@ -43,7 +45,15 @@ class _NumberFieldState extends State<NumberField> {
   Widget build(BuildContext context) {
     return TextFormField(
       controller: _c,
-      decoration: InputDecoration(labelText: widget.label),
+      textAlign: widget.dense ? TextAlign.center : TextAlign.start,
+      style: widget.dense ? const TextStyle(fontSize: 13) : null,
+      decoration: widget.dense
+          ? const InputDecoration(
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+              border: OutlineInputBorder(),
+            )
+          : InputDecoration(labelText: widget.label),
       keyboardType: TextInputType.numberWithOptions(decimal: widget.allowDecimal),
       inputFormatters: [
         FilteringTextInputFormatter.allow(

@@ -7,10 +7,14 @@ class EntriesRepository {
   /// SOP: SOP_A..D / G_SOP / C_PACKING
   /// rows: {"S_B": {"exp":..,"dom":..,"std":..,"nc":..,"cause":..,"note":..}, ...}
   Future<void> createSop(String unit, Map<String, Map<String, dynamic>> rows,
-      {Map<String, dynamic>? bulkLog}) async {
+      {Map<String, dynamic>? bulkLog, String generalNotes = ""}) async {
     final res = await ApiClient.instance.dio.post(
       "/api/entries/sop/$unit/",
-      data: {"general_notes": "", "rows": rows, if (bulkLog != null) "bulk_log": bulkLog},
+      data: {
+        "general_notes": generalNotes,
+        "rows": rows,
+        if (bulkLog != null) "bulk_log": bulkLog,
+      },
     );
     if (res.statusCode != 201) _err(res);
   }

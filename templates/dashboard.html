@@ -1,7 +1,11 @@
 {% extends "base.html" %}
 {% block title %}الرئيسية — QC Report{% endblock %}
 {% block content %}
-<h3 class="mb-4">مرحباً، {{ user.username }}</h3>
+<div class="d-flex justify-content-between align-items-center mb-1">
+  <h3 class="mb-0">مرحباً، {{ user.username }}</h3>
+  <span class="hud-tag"><span class="unit-dot"></span>QC-CORE // BUILD 2050</span>
+</div>
+<div class="mb-4"></div>
 
 {% if is_manager %}
   <div class="card mb-4">
@@ -18,7 +22,9 @@
       <div class="row g-2">
         {% for u in units %}
           <div class="col-6 col-md-4 col-lg-3">
-            <a href="{% url 'entry_new' u.value %}" class="btn btn-outline-primary w-100">{{ u.label }}</a>
+            <a href="{% url 'entry_new' u.value %}" class="btn btn-outline-primary w-100">
+              <span class="unit-dot"></span>{{ u.label }}
+            </a>
           </div>
         {% endfor %}
       </div>

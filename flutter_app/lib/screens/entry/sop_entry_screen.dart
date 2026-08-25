@@ -40,11 +40,24 @@ class SopEntryScreen extends StatefulWidget {
 class _SopEntryScreenState extends State<SopEntryScreen> {
   final _entries = EntriesRepository();
   late final List<String> _products = kSopProducts[widget.unit]!;
-  late final Map<String, Map<String, NumberField>> _fields = {
+
+  /// كل منتج ليه: exp/dom/std/nc (رقمي) + cause/note (نص، مش لو G_SOP) +
+  /// defect_reason/notes (نص) + car_number/car_weight (رقمي، صف BULK بس)
+  /// — بالظبط نفس الحقول العشرة اللي الـ API بتستناها (راجع api_views.py).
+  late final Map<String, Map<String, dynamic>> _fields = {
     for (final pt in _products)
       pt: {
-        for (final f in const ["exp", "dom", "std", "nc"])
-          f: NumberField.zero(label: f.toUpperCase())
+        "exp": NumberField.zero(label: "EXP"),
+        "dom": NumberField.zero(label: "DOM"),
+        "std": NumberField.zero(label: "STD"),
+        "nc": NumberField.zero(label: "NC"),
+        if (widget.unit != "G_SOP") "cause": TextEditingController(),
+        if (widget.unit != "G_SOP") "note": TextEditingController(),
+        "defect_reason": TextEditingController(),
+        "notes": TextEditingController(),
+        if (pt == "BULK") "car_number": NumberField.zero(label: "رقم العربية"),
+        if (pt == "BULK")
+          "car_weight": NumberField.zero(label: "وزن العربية", allowDecimal: true),
       }
   };
   late final Map<String, NumberField> _bulk = {
@@ -53,9 +66,12 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
     "std_trucks": NumberField.zero(label: "عربيات STD"),
     "nc_trucks": NumberField.zero(label: "عربيات NC"),
   };
+  final _generalNotes = TextEditingController();
+
   bool _loading = true;
   bool _saving = false;
   EntryStatus? _status;
+  String? _userName;
   String? _error;
 
   @override
@@ -66,11 +82,14 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
 
   Future<void> _load() async {
     try {
-      final st =
-          await AuthRepository().entryStatus(widget.unit);
+      final results = await Future.wait([
+        AuthRepository().entryStatus(widget.unit),
+        AuthRepository().me(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _status = st;
+        _status = results[0] as EntryStatus;
+        _userName = (results[1] as UserModel).fullName;
         _loading = false;
       });
     } catch (e) {
@@ -81,16 +100,35 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
     }
   }
 
+  num _numVal(dynamic field) =>
+      field is NumberField ? field.value() : 0;
+
+  String _textVal(dynamic field) =>
+      field is TextEditingController ? field.text.trim() : "";
+
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
       final rows = <String, Map<String, dynamic>>{};
       for (final pt in _products) {
-        rows[pt] = {for (final e in _fields[pt]!.entries) e.key: e.value.value()};
+        final f = _fields[pt]!;
+        rows[pt] = {
+          "exp": _numVal(f["exp"]),
+          "dom": _numVal(f["dom"]),
+          "std": _numVal(f["std"]),
+          "nc": _numVal(f["nc"]),
+          if (widget.unit != "G_SOP") "cause": _textVal(f["cause"]),
+          if (widget.unit != "G_SOP") "note": _textVal(f["note"]),
+          "defect_reason": _textVal(f["defect_reason"]),
+          "notes": _textVal(f["notes"]),
+          if (pt == "BULK") "car_number": _numVal(f["car_number"]),
+          if (pt == "BULK") "car_weight": _numVal(f["car_weight"]),
+        };
       }
       await _entries.createSop(
         widget.unit,
         rows,
+        generalNotes: _generalNotes.text.trim(),
         bulkLog: kBulkUnits.contains(widget.unit)
             ? {for (final e in _bulk.entries) e.key: e.value.value()}
             : null,
@@ -107,6 +145,139 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  /// هيدر الوردية: الموظف / الوحدة / التاريخ / الوردية — زي partials/shift_fields.html
+  Widget _shiftHeader() {
+    Widget cell(String label, String value) => Expanded(
+          child: Column(
+            children: [
+              Text(label,
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+              const SizedBox(height: 2),
+              Text(value,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+            ],
+          ),
+        );
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Row(
+          children: [
+            cell("الموظف", _userName ?? "-"),
+            cell("الوحدة", widget.unitLabel),
+            cell("التاريخ", _status?.date ?? "-"),
+            cell("الوردية", _status?.shiftLabel ?? "-"),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _denseNumber(NumberField f) => SizedBox(width: 72, child: f);
+
+  Widget _denseText(TextEditingController c, {double width = 110}) => SizedBox(
+        width: width,
+        child: TextFormField(
+          controller: c,
+          style: const TextStyle(fontSize: 13),
+          decoration: const InputDecoration(
+            isDense: true,
+            contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+            border: OutlineInputBorder(),
+          ),
+        ),
+      );
+
+  Widget _disabledCell() => const SizedBox(
+        width: 72,
+        child: Center(child: Text("—", style: TextStyle(color: Colors.grey))),
+      );
+
+  /// جدول الإدخال بشكل Excel-grid: صف لكل منتج وعمود لكل حقل — بالظبط زي
+  /// templates/entry_sop.html بدل ما كل منتج يبقى كارت منفصل غير مكتمل.
+  Widget _productsTable() {
+    final showCauseNote = widget.unit != "G_SOP";
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: DataTable(
+            headingRowHeight: 40,
+            dataRowMinHeight: 56,
+            dataRowMaxHeight: 64,
+            columnSpacing: 10,
+            columns: [
+              const DataColumn(label: Text("المنتج")),
+              const DataColumn(label: Text("EXP")),
+              const DataColumn(label: Text("DOM")),
+              const DataColumn(label: Text("STD")),
+              const DataColumn(label: Text("NC")),
+              if (showCauseNote) const DataColumn(label: Text("Cause")),
+              if (showCauseNote) const DataColumn(label: Text("Note")),
+              const DataColumn(label: Text("سبب العيب")),
+              const DataColumn(label: Text("ملاحظات")),
+              const DataColumn(label: Text("رقم العربية")),
+              const DataColumn(label: Text("وزن العربية")),
+            ],
+            rows: [
+              for (final pt in _products)
+                DataRow(cells: [
+                  DataCell(Text(kProductLabels[pt] ?? pt,
+                      style: const TextStyle(fontWeight: FontWeight.bold))),
+                  DataCell(_denseNumber(_fields[pt]!["exp"])),
+                  DataCell(_denseNumber(_fields[pt]!["dom"])),
+                  DataCell(_denseNumber(_fields[pt]!["std"])),
+                  DataCell(_denseNumber(_fields[pt]!["nc"])),
+                  if (showCauseNote)
+                    DataCell(_denseText(_fields[pt]!["cause"])),
+                  if (showCauseNote)
+                    DataCell(_denseText(_fields[pt]!["note"])),
+                  DataCell(_denseText(_fields[pt]!["defect_reason"])),
+                  DataCell(_denseText(_fields[pt]!["notes"])),
+                  DataCell(pt == "BULK"
+                      ? _denseNumber(_fields[pt]!["car_number"])
+                      : _disabledCell()),
+                  DataCell(pt == "BULK"
+                      ? _denseNumber(_fields[pt]!["car_weight"])
+                      : _disabledCell()),
+                ]),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _bulkTrucksCard() {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("عربيات BULK",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 8),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 3.5,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              children: [for (final b in _bulk.values) b],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -130,73 +301,23 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
                   ? Center(child: Text(_error!))
                   : ListView(
                       children: [
-                        Card(
-                          color: const Color(0xFFD9EAD3),
-                          child: Padding(
-                            padding: const EdgeInsets.all(10),
-                            child: Text(
-                                "الوردية المتاحة: ${_status?.shiftLabel ?? "-"}",
-                                style: const TextStyle(fontWeight: FontWeight.bold)),
+                        _shiftHeader(),
+                        const Text("ملاحظات عامة",
+                            style: TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 4),
+                        TextFormField(
+                          controller: _generalNotes,
+                          minLines: 1,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            border: OutlineInputBorder(),
                           ),
                         ),
-                        ..._products.map((pt) => Card(
-                              margin: const EdgeInsets.symmetric(vertical: 6),
-                              child: Padding(
-                                padding: const EdgeInsets.all(10),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(kProductLabels[pt] ?? pt,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold,
-                                            fontSize: 16)),
-                                    const SizedBox(height: 8),
-                                    GridView.count(
-                                      crossAxisCount: 4,
-                                      shrinkWrap: true,
-                                      physics:
-                                          const NeverScrollableScrollPhysics(),
-                                      childAspectRatio: 2.2,
-                                      mainAxisSpacing: 8,
-                                      crossAxisSpacing: 8,
-                                      children: [
-                                        for (final e in _fields[pt]!.entries)
-                                          e.value
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            )),
-                        if (kBulkUnits.contains(widget.unit))
-                          Card(
-                            margin: const EdgeInsets.symmetric(vertical: 6),
-                            child: Padding(
-                              padding: const EdgeInsets.all(10),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text("العربيات (Bulk)",
-                                      style: TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 16)),
-                                  const SizedBox(height: 8),
-                                  GridView.count(
-                                    crossAxisCount: 2,
-                                    shrinkWrap: true,
-                                    physics:
-                                        const NeverScrollableScrollPhysics(),
-                                    childAspectRatio: 3.5,
-                                    mainAxisSpacing: 8,
-                                    crossAxisSpacing: 8,
-                                    children: [
-                                      for (final b in _bulk.values) b
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                        const SizedBox(height: 8),
+                        _productsTable(),
+                        if (kBulkUnits.contains(widget.unit)) _bulkTrucksCard(),
                         const SizedBox(height: 12),
                         SaveButton(onPressed: _saving ? null : _save),
                       ],
