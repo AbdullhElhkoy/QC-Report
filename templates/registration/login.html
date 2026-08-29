@@ -1,12 +1,16 @@
 {% extends "base.html" %}
 {% block title %}تسجيل الدخول — QC Report{% endblock %}
+{% block navbar %}{% endblock %}
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-12 col-md-5 col-lg-4">
-    <div class="card mt-5">
-      <div class="card-body">
-        <h4 class="card-title text-center mb-1">تسجيل الدخول</h4>
-        <p class="text-center hud-tag mb-4"><span class="unit-dot"></span>QC-CORE // BUILD 2050</p>
+    <div class="text-center mt-5 mb-4">
+      <div class="brand-mark mx-auto mb-3" style="width:52px; height:52px; font-size:1.25rem; border-radius:14px;">QC</div>
+      <h4 class="mb-1">نظام تقرير مراقبة الجودة</h4>
+      <p class="hud-tag mb-0">Evergrow Fertilizer</p>
+    </div>
+    <div class="card">
+      <div class="card-body p-4">
         {% if form.errors %}
           <div class="alert alert-danger">اسم المستخدم أو كلمة المرور غير صحيحة.</div>
         {% endif %}
@@ -17,7 +21,7 @@
             <input type="text" name="{{ form.username.html_name }}" id="{{ form.username.id_for_label }}"
                    class="form-control" required autofocus>
           </div>
-          <div class="mb-3">
+          <div class="mb-4">
             <label class="form-label" for="{{ form.password.id_for_label }}">كلمة المرور</label>
             <input type="password" name="{{ form.password.html_name }}" id="{{ form.password.id_for_label }}"
                    class="form-control" required>

@@ -4,6 +4,7 @@ import 'api/api_client.dart';
 import 'api/auth_repository.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/login_screen.dart';
+import 'theme.dart';
 
 /// عنوان الـ API بيتحدد وقت البناء:
 /// flutter run --dart-define=API_BASE_URL=http://<ip>:8000
@@ -26,14 +27,7 @@ class QcReportApp extends StatelessWidget {
     return MaterialApp(
       title: "QC Report",
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF274E13),
-        useMaterial3: true,
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-          isDense: true,
-        ),
-      ),
+      theme: buildAppTheme(),
       locale: const Locale("ar"),
       builder: (context, child) => Directionality(
         textDirection: TextDirection.rtl,
