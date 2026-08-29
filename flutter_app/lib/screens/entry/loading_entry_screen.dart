@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../api/api_client.dart';
 import '../../api/auth_repository.dart';
 import '../../api/entries_repository.dart';
+import '../../theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/number_field.dart';
 
@@ -29,6 +30,7 @@ class _LoadingEntryScreenState extends State<LoadingEntryScreen> {
   bool _loading = true;
   bool _saving = false;
   EntryStatus? _status;
+  String? _userName;
   String? _error;
 
   @override
@@ -39,10 +41,14 @@ class _LoadingEntryScreenState extends State<LoadingEntryScreen> {
 
   Future<void> _load() async {
     try {
-      final st = await AuthRepository().entryStatus("LOADING");
+      final results = await Future.wait([
+        AuthRepository().entryStatus("LOADING"),
+        AuthRepository().me(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _status = st;
+        _status = results[0] as EntryStatus;
+        _userName = (results[1] as UserModel).fullName;
         _loading = false;
       });
     } catch (e) {
@@ -61,17 +67,97 @@ class _LoadingEntryScreenState extends State<LoadingEntryScreen> {
           pt: {for (final e in _fields[pt]!.entries) e.key: e.value.value()},
       });
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("تم الحفظ ✅")));
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("تم الحفظ ✅")));
       Navigator.of(context).pop();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.danger,
           content: Text(ApiClient.extractErrorFromException(e))));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Widget _headerCell(String label, String value, {bool bold = false}) =>
+      Expanded(
+        child: Column(
+          children: [
+            Text(label,
+                style:
+                    const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+            const SizedBox(height: 2),
+            Text(value,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontWeight: bold ? FontWeight.w800 : FontWeight.w600)),
+          ],
+        ),
+      );
+
+  Widget _shiftHeader() {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Row(
+          children: [
+            _headerCell("الموظف", _userName ?? "-"),
+            _headerCell("الوحدة", "LOADING"),
+            _headerCell("التاريخ", _status?.date ?? "-"),
+            _headerCell("الوردية", _status?.shiftLabel ?? "-"),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _productsTable() {
+    final table = Table(
+      border: TableBorder.all(color: AppColors.border),
+      defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+      columnWidths: const {
+        0: FixedColumnWidth(140),
+        1: FlexColumnWidth(),
+        2: FlexColumnWidth(),
+      },
+      children: [
+        TableRow(
+          decoration: const BoxDecoration(color: AppColors.primarySoft),
+          children: const [
+            _HeadCell("نوع المنتج"),
+            _HeadCell("EXP"),
+            _HeadCell("DOM"),
+          ],
+        ),
+        for (final pt in kLoadingProducts)
+          TableRow(
+            children: [
+              _LabelCell(pt),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: _fields[pt]!["exp"]!,
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                child: _fields[pt]!["dom"]!,
+              ),
+            ],
+          ),
+      ],
+    );
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: table,
+        ),
+      ),
+    );
   }
 
   @override
@@ -85,7 +171,8 @@ class _LoadingEntryScreenState extends State<LoadingEntryScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.task_alt, size: 64, color: Colors.green),
+                      Icon(Icons.task_alt,
+                          size: 64, color: AppColors.primary),
                       SizedBox(height: 12),
                       Text("الورديات الثلاثة اتسجلت بالفعل اليوم."),
                     ],
@@ -95,63 +182,49 @@ class _LoadingEntryScreenState extends State<LoadingEntryScreen> {
                   ? Center(child: Text(_error!))
                   : ListView(
                       children: [
-                        Card(
-                          color: const Color(0xFFD9EAD3),
-                          child: Padding(
-                            padding: const EdgeInsets.all(10),
-                            child: Text(
-                                "الوردية المتاحة: ${_status?.shiftLabel ?? "-"}",
-                                style:
-                                    const TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                        // التحميلات بالعرض: أعمدة المنتجات وصفوف EXP/DOM
-                        Card(
-                          margin: const EdgeInsets.symmetric(vertical: 6),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.all(10),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    const SizedBox(
-                                        width: 60, child: Text("", textAlign: TextAlign.center)),
-                                    for (final pt in kLoadingProducts)
-                                      SizedBox(
-                                          width: 90,
-                                          child: Text(pt,
-                                              textAlign: TextAlign.center,
-                                              style: const TextStyle(
-                                                  fontWeight: FontWeight.bold))),
-                                  ],
-                                ),
-                                for (final field in const ["exp", "dom"])
-                                  Row(
-                                    children: [
-                                      SizedBox(
-                                          width: 60,
-                                          child: Text(field.toUpperCase(),
-                                              style: const TextStyle(
-                                                  fontWeight: FontWeight.bold))),
-                                      for (final pt in kLoadingProducts)
-                                        SizedBox(
-                                            width: 90,
-                                            child: Padding(
-                                                padding:
-                                                    const EdgeInsets.all(4),
-                                                child: _fields[pt]![field]!)),
-                                    ],
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        _shiftHeader(),
+                        const Text("التحميل — كمية الوحدات المصنّعة الموردة للتحميل",
+                            style: TextStyle(
+                                color: AppColors.textMuted, fontSize: 12)),
+                        const SizedBox(height: 4),
+                        _productsTable(),
                         const SizedBox(height: 12),
                         SaveButton(onPressed: _saving ? null : _save),
                       ],
                     ),
+    );
+  }
+}
+
+class _HeadCell extends StatelessWidget {
+  final String text;
+  const _HeadCell(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Text(text,
+          style: const TextStyle(
+              fontWeight: FontWeight.w700, color: AppColors.primaryStrong)),
+    );
+  }
+}
+
+class _LabelCell extends StatelessWidget {
+  final String text;
+  const _LabelCell(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      color: AppColors.surface2,
+      child: Text(text,
+          style: const TextStyle(
+              fontWeight: FontWeight.w700, color: AppColors.text)),
     );
   }
 }
