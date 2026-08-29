@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../api/api_client.dart';
 import '../../api/auth_repository.dart';
 import '../../api/entries_repository.dart';
+import '../../theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/number_field.dart';
 
@@ -33,13 +34,16 @@ class _GccEntryScreenState extends State<GccEntryScreen> {
   final Map<String, TextEditingController> _notes = {
     for (final c in kGccColors) c.$1: TextEditingController()
   };
-  late final NumberField _sb = NumberField.zero(label: "SB", allowDecimal: true);
-  late final NumberField _nc = NumberField.zero(label: "NC", allowDecimal: true);
-  int _total = 0;
+  late final NumberField _sb =
+      NumberField.zero(label: "SB", allowDecimal: true);
+  late final NumberField _nc =
+      NumberField.zero(label: "NC", allowDecimal: true);
+  String _total = "0";
 
   bool _loading = true;
   bool _saving = false;
   EntryStatus? _status;
+  String? _userName;
   String? _error;
 
   @override
@@ -57,15 +61,20 @@ class _GccEntryScreenState extends State<GccEntryScreen> {
     for (final f in _bb.values) {
       t += f.value();
     }
-    setState(() => _total = t.toInt());
+    setState(() => _total =
+        (t == t.roundToDouble() ? t.toInt().toString() : t.toStringAsFixed(2)));
   }
 
   Future<void> _load() async {
     try {
-      final st = await AuthRepository().entryStatus(widget.unit);
+      final results = await Future.wait([
+        AuthRepository().entryStatus(widget.unit),
+        AuthRepository().me(),
+      ]);
       if (!mounted) return;
       setState(() {
-        _status = st;
+        _status = results[0] as EntryStatus;
+        _userName = (results[1] as UserModel).fullName;
         _loading = false;
       });
     } catch (e) {
@@ -99,11 +108,44 @@ class _GccEntryScreenState extends State<GccEntryScreen> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          backgroundColor: Colors.red,
+          backgroundColor: AppColors.danger,
           content: Text(ApiClient.extractErrorFromException(e))));
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Widget _headerCell(String label, String value, {bool bold = false}) =>
+      Expanded(
+        child: Column(
+          children: [
+            Text(label,
+                style:
+                    const TextStyle(color: AppColors.textMuted, fontSize: 12)),
+            const SizedBox(height: 2),
+            Text(value,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontWeight: bold ? FontWeight.w800 : FontWeight.w600)),
+          ],
+        ),
+      );
+
+  Widget _shiftHeader() {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 4),
+        child: Row(
+          children: [
+            _headerCell("الموظف", _userName ?? "-"),
+            _headerCell("الوحدة", widget.unit),
+            _headerCell("التاريخ", _status?.date ?? "-"),
+            _headerCell("الوردية", _status?.shiftLabel ?? "-"),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -117,7 +159,8 @@ class _GccEntryScreenState extends State<GccEntryScreen> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.task_alt, size: 64, color: Colors.green),
+                      Icon(Icons.task_alt,
+                          size: 64, color: AppColors.primary),
                       SizedBox(height: 12),
                       Text("الورديات الثلاثة اتسجلت بالفعل اليوم."),
                     ],
@@ -127,6 +170,7 @@ class _GccEntryScreenState extends State<GccEntryScreen> {
                   ? Center(child: Text(_error!))
                   : ListView(
                       children: [
+                        _shiftHeader(),
                         Card(
                           color: const Color(0xFF274E13),
                           child: const Padding(
@@ -192,7 +236,7 @@ class _GccEntryScreenState extends State<GccEntryScreen> {
                                       verticalAlignment:
                                           TableCellVerticalAlignment.fill,
                                       child: Center(
-                                          child: Text("$_total",
+                                          child: Text(_total,
                                               style: const TextStyle(
                                                   fontWeight: FontWeight.bold,
                                                   fontSize: 20,
