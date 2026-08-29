@@ -25,6 +25,28 @@ class UserModel {
       );
 }
 
+/// وردية اليوم الخاصة بوحدة
+class TodayEntry {
+  final int id;
+  final String shift;
+  final String shiftLabel;
+  final String submittedAt;
+
+  TodayEntry({
+    required this.id,
+    required this.shift,
+    required this.shiftLabel,
+    required this.submittedAt,
+  });
+
+  factory TodayEntry.fromJson(Map<String, dynamic> j) => TodayEntry(
+        id: j["id"],
+        shift: j["shift"],
+        shiftLabel: j["shift_label"],
+        submittedAt: j["submitted_at"] ?? "",
+      );
+}
+
 /// حالة الوردية لوحدة معينة
 class EntryStatus {
   final String unit;
@@ -32,6 +54,7 @@ class EntryStatus {
   final String date;
   final String? nextShift;
   final bool allShiftsDoneToday;
+  final List<TodayEntry> todayEntries;
 
   EntryStatus({
     required this.unit,
@@ -39,6 +62,7 @@ class EntryStatus {
     required this.date,
     required this.nextShift,
     required this.allShiftsDoneToday,
+    this.todayEntries = const [],
   });
 
   factory EntryStatus.fromJson(Map<String, dynamic> j) => EntryStatus(
@@ -47,6 +71,10 @@ class EntryStatus {
         date: j["date"],
         nextShift: j["next_shift"],
         allShiftsDoneToday: j["all_shifts_done_today"] == true,
+        todayEntries: [
+          for (final e in (j["today_entries"] as List? ?? const []))
+            TodayEntry.fromJson(e),
+        ],
       );
 
   String get shiftLabel {

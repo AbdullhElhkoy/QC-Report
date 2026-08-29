@@ -140,6 +140,11 @@ class EntryStatusAPIView(APIView):
             return Response({"detail": "لا تملك صلاحية الوصول لهذه الوحدة."}, status=403)
         today = timezone.localdate()
         next_shift = next_shift_for(unit, today)
+        from qc_report.models import ShiftEntry
+
+        entries = ShiftEntry.objects.filter(
+            entry_date=today, unit=unit
+        ).order_by("shift")
         return Response(
             {
                 "unit": unit,
@@ -147,6 +152,15 @@ class EntryStatusAPIView(APIView):
                 "date": today.isoformat(),
                 "next_shift": next_shift,
                 "all_shifts_done_today": next_shift is None,
+                "today_entries": [
+                    {
+                        "id": e.pk,
+                        "shift": e.shift,
+                        "shift_label": e.get_shift_display(),
+                        "submitted_at": e.submitted_at.astimezone().strftime("%H:%M"),
+                    }
+                    for e in entries
+                ],
             }
         )
 
