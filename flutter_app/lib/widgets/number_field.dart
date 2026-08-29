@@ -9,6 +9,7 @@ class NumberField extends StatefulWidget {
   final bool allowDecimal;
   final int flex;
   final bool dense;
+  final VoidCallback? onChanged;
 
   const NumberField({
     super.key,
@@ -17,13 +18,19 @@ class NumberField extends StatefulWidget {
     this.allowDecimal = false,
     this.flex = 1,
     this.dense = false,
+    this.onChanged,
   });
 
-  factory NumberField.zero({required String label, bool allowDecimal = false}) {
+  factory NumberField.zero({
+    required String label,
+    bool allowDecimal = false,
+    VoidCallback? onChanged,
+  }) {
     return NumberField(
       label: label,
       controller: TextEditingController(text: "0"),
       allowDecimal: allowDecimal,
+      onChanged: onChanged,
     );
   }
 
@@ -68,6 +75,7 @@ class _NumberFieldState extends State<NumberField> {
       },
       onChanged: (t) {
         if (t.trim().isEmpty) _c.text = "0";
+        widget.onChanged?.call();
       },
     );
   }
