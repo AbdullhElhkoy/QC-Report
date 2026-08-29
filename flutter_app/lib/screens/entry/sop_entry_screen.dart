@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../api/api_client.dart';
 import '../../api/auth_repository.dart';
 import '../../api/entries_repository.dart';
+import '../../theme.dart';
 import '../../widgets/app_scaffold.dart';
 import '../../widgets/number_field.dart';
 
@@ -209,9 +210,13 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
           scrollDirection: Axis.horizontal,
           child: DataTable(
             headingRowHeight: 40,
+            headingTextStyle: const TextStyle(
+                fontWeight: FontWeight.w700, color: AppColors.primaryStrong),
+            headingRowColor: WidgetStatePropertyAll(AppColors.primarySoft),
             dataRowMinHeight: 56,
             dataRowMaxHeight: 64,
             columnSpacing: 10,
+            dividerThickness: 1,
             columns: [
               const DataColumn(label: Text("المنتج")),
               const DataColumn(label: Text("EXP")),
@@ -228,8 +233,17 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
             rows: [
               for (final pt in _products)
                 DataRow(cells: [
-                  DataCell(Text(kProductLabels[pt] ?? pt,
-                      style: const TextStyle(fontWeight: FontWeight.bold))),
+                  DataCell(
+                    SizedBox(
+                      width: 74,
+                      child: Center(
+                        child: Text(kProductLabels[pt] ?? pt,
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.text)),
+                      ),
+                    ),
+                  ),
                   DataCell(_denseNumber(_fields[pt]!["exp"])),
                   DataCell(_denseNumber(_fields[pt]!["dom"])),
                   DataCell(_denseNumber(_fields[pt]!["std"])),
@@ -258,21 +272,25 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 6),
       child: Padding(
-        padding: const EdgeInsets.all(10),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text("عربيات BULK",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+            const SizedBox(height: 4),
+            const Text("أدخل أعداد العربيات الموزعة على الأنواع.",
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
             const SizedBox(height: 8),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: 3.5,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              children: [for (final b in _bulk.values) b],
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                SizedBox(width: 150, child: _bulk["exp_trucks"]),
+                SizedBox(width: 150, child: _bulk["dom_trucks"]),
+                SizedBox(width: 150, child: _bulk["std_trucks"]),
+                SizedBox(width: 150, child: _bulk["nc_trucks"]),
+              ],
             ),
           ],
         ),
@@ -286,17 +304,17 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
       title: "${widget.unitLabel} — إدخال",
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : _status != null && _status!.allShiftsDoneToday
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.task_alt, size: 64, color: Colors.green),
-                      SizedBox(height: 12),
-                      Text("الورديات الثلاثة اتسجلت بالفعل اليوم."),
-                    ],
-                  ),
-                )
+: _status != null && _status!.allShiftsDoneToday
+                  ? Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.task_alt, size: 64, color: AppColors.primary),
+                          SizedBox(height: 12),
+                          Text("الورديات الثلاثة اتسجلت بالفعل اليوم."),
+                        ],
+                      ),
+                    )
               : _error != null
                   ? Center(child: Text(_error!))
                   : ListView(
