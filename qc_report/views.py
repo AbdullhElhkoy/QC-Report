@@ -224,7 +224,11 @@ def build_sop_rows(unit, data=None, entry=None):
 
 def save_sop_rows(entry, data):
     for pt in SOP_PRODUCT_TYPES[entry.unit]:
-        form = SOPLineItemForm(data, prefix=f"row_{pt}")
+        form = SOPLineItemForm(
+            data,
+            instance=entry.sop_line_items.filter(product_type=pt).first(),
+            prefix=f"row_{pt}",
+        )
         if form.is_valid():
             obj = form.save(commit=False)
             obj.shift_entry = entry
@@ -245,7 +249,11 @@ def build_loading_rows(data=None, entry=None):
 
 def save_loading_rows(entry, data):
     for pt in LoadingProductType:
-        form = LoadingLineItemForm(data, prefix=f"row_{pt}")
+        form = LoadingLineItemForm(
+            data,
+            instance=entry.loading_line_items.filter(product_type=pt).first(),
+            prefix=f"row_{pt}",
+        )
         if form.is_valid():
             obj = form.save(commit=False)
             obj.shift_entry = entry
@@ -961,6 +969,23 @@ def record_detail(request, pk):
             "sections": entry_tables(entry),
         },
     )
+
+
+@login_required
+def record_delete(request, pk):
+    """حذف إدخال (بعلاقاته تلقائيًا) — للمدير أو صاحب الإدخال بس."""
+    entry = get_object_or_404(
+        ShiftEntry.objects.select_related("submitted_by"), pk=pk
+    )
+    if not (request.user.is_manager or entry.submitted_by == request.user):
+        messages.error(request, "لا تملك صلاحية حذف هذا الإدخال.")
+        return redirect("records")
+    if request.method != "POST":
+        return redirect("records")
+    label = unit_label(entry.unit)
+    entry.delete()
+    messages.success(request, f"تم حذف إدخال {label} بتاريخ {entry.entry_date}.")
+    return redirect(request.GET.get("next") or "records")
 
 
 def _excel_cell(field, value):

@@ -27,4 +27,5 @@ urlpatterns = [
     path("records/", views.records_list, name="records"),
     path("records/export/", views.records_export, name="records_export"),
     path("records/<int:pk>/", views.record_detail, name="record_detail"),
+    path("records/<int:pk>/delete/", views.record_delete, name="record_delete"),
 ]

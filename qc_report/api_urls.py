@@ -20,7 +20,8 @@ urlpatterns = [
     # ---- Lookup endpoints for dynamic dropdowns ----
     path("dcp-reasons/", api_views.DCPReasonsAPIView.as_view(), name="api_dcp_reasons"),
     path("packing-types/<str:factory>/", api_views.PackingTypesAPIView.as_view(), name="api_packing_types"),
-    # ---- Entry detail (generic, any unit) ----
+    # ---- Entry detail (generic, any unit) + قائمة السجل ----
+    path("entries/", api_views.EntriesListAPIView.as_view(), name="api_entries"),
     path("entries/<int:pk>/", api_views.EntryDetailAPIView.as_view(), name="api_entry_detail"),
     # ---- Reports ----
     path("reports/daily/<date:date>/", api_views.DailyReportAPIView.as_view(), name="api_report_daily"),

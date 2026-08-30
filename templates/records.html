@@ -62,6 +62,12 @@
               {% if user.is_manager or e.submitted_by == user %}
                 <a href="{% url 'entry_edit' e.unit e.entry_date e.shift %}"
                    class="btn btn-sm btn-outline-secondary">تعديل</a>
+                <form action="{% url 'record_delete' e.pk %}" method="post"
+                      class="d-inline"
+                      onsubmit="return confirm('حذف هذا الإدخال نهائيًا؟');">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-sm btn-outline-danger">حذف</button>
+                </form>
               {% endif %}
             </td>
           </tr>

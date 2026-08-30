@@ -24,6 +24,7 @@ from .aggregations import full_daily_report
 from .models import (
     DCPReason,
     DCPReasonCategory,
+    EntryRevision,
     GCCColor,
     LoadingProductType,
     PackingFactory,
@@ -47,6 +48,9 @@ from .forms import (
     SOPLineItemForm,
 )
 from .views import (
+    _build_all_forms,
+    _flatten_forms,
+    _save_related,
     entry_tables,
     gcc_color_form,
     get_unit_or_404,
@@ -54,6 +58,7 @@ from .views import (
     save_dcp_forms,
     save_loading_rows,
     save_sop_rows,
+    snapshot_entry,
     unit_label,
     user_can_access_unit,
     SOP_UNIT_TEMPLATES,
@@ -95,6 +100,169 @@ def _no_shift_response(unit_lbl):
         {"detail": f"تم تسجيل ورديات اليوم الثلاثة لوحدة {unit_lbl} بالفعل."},
         status=409,
     )
+
+
+def _flat_from_payload(unit, payload):
+    """بي steady نفس تحويل الـ create views: payload JSON -> QueryDict مسطّح
+    بالـ prefixes اللي فورمز الويب بتفهمها. بيستخدم في التعديل (PUT)."""
+    flat = {"general_notes": payload.get("general_notes", "")}
+    if unit in SOP_UNIT_TEMPLATES:
+        rows = payload.get("rows", {})
+        for pt in SOP_PRODUCT_TYPES[unit]:
+            row = rows.get(pt, {}) or {}
+            for field in ("exp", "dom", "std", "nc", "cause", "note",
+                          "defect_reason", "notes", "car_number", "car_weight"):
+                if field in row:
+                    flat[f"row_{pt}-{field}"] = row[field]
+        if unit in SOP_BULK_UNITS and payload.get("bulk_log"):
+            for field, val in payload["bulk_log"].items():
+                flat[f"bulk-{field}"] = val
+    elif unit in ("GCC1", "GCC2"):
+        colors_in = payload.get("colors", {})
+        for color in GCCColor:
+            row = colors_in.get(color.value, {}) or {}
+            flat[f"gcc_{color.value.lower()}-bb"] = row.get("bb", 0) or 0
+            flat[f"gcc_{color.value.lower()}-defect_reason"] = row.get("defect_reason", "")
+            flat[f"gcc_{color.value.lower()}-note"] = row.get("note", "")
+        flat["gcc_sum-sb"] = payload.get("sb", 0) or 0
+        flat["gcc_sum-nc"] = payload.get("nc", 0) or 0
+    elif unit == "LOADING":
+        rows = payload.get("rows", {})
+        for pt in LoadingProductType:
+            row = rows.get(pt, {}) or {}
+            for field in ("exp", "dom"):
+                if field in row:
+                    flat[f"row_{pt}-{field}"] = row[field]
+    elif unit == "DCP":
+        section_map = (("bb", DCPBBRowForm), ("sb", DCPSBRowForm),
+                       ("as_row", DCPASRowForm), ("tests", DCPTestsForm))
+        prefix_map = {"bb": "bb", "sb": "sb", "as_row": "as", "tests": "tests"}
+        field_map = {
+            "bb": ["green", "yellow", "green_yellow", "blue", "white", "red", "note"],
+            "sb": ["exp", "dom", "sb_white", "note"],
+            "as_row": ["exp", "dom", "sb_white", "note"],
+            "tests": ["lab_test", "floor_test"],
+        }
+        for key, _cls in section_map:
+            section = payload.get(key, {}) or {}
+            for field in field_map[key]:
+                if field in section:
+                    flat[f"{prefix_map[key]}-{field}"] = section[field]
+        return flat, payload.get("white_reasons") or [], payload.get("nc_reasons") or []
+    elif unit in ("PA", "SA"):
+        values = payload.get("values", {}) or {}
+        table = PackingTableForm(unit, entry=None, prefix=unit.lower())
+        for t in table.types:
+            flat[f"{unit.lower()}-type_{t.pk}"] = values.get(str(t.pk), values.get(t.pk, 0)) or 0
+    return flat
+
+
+def _build_payload_qd(unit, payload):
+    """يرجع QueryDict جاهز للفورمز (مع أسباب DCP setlist)."""
+    if unit == "DCP":
+        flat, w_reasons, n_reasons = _flat_from_payload(unit, payload)
+        data = _querydict_from_json(flat)
+        data.setlist("w_reason", [str(r.get("reason_id", "")) for r in w_reasons])
+        data.setlist("w_qty", [str(r.get("qty", 0)) for r in w_reasons])
+        data.setlist("n_reason", [str(r.get("reason_id", "")) for r in n_reasons])
+        data.setlist("n_qty", [str(r.get("qty", 0)) for r in n_reasons])
+        return data
+    return _querydict_from_json(_flat_from_payload(unit, payload))
+
+
+def _num(value):
+    if isinstance(value, int) or isinstance(value, float):
+        return value
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0
+
+
+def entry_edit_values(entry):
+    """قيم الإدخال الحالي بنفس شكل الـ create payloads عشان شاشة التعديل
+    في Flutter تقدر تملأ نفس الحقول (pre-fill)."""
+    unit = entry.unit
+    values = {"general_notes": entry.general_notes}
+    if unit in SOP_UNIT_TEMPLATES:
+        rows = {}
+        for pt in SOP_PRODUCT_TYPES[unit]:
+            line = entry.sop_line_items.filter(product_type=pt).first()
+            if line is None:
+                rows[pt] = {}
+                continue
+            row = {
+                "exp": line.exp, "dom": line.dom, "std": line.std, "nc": line.nc,
+                "cause": line.cause, "note": line.note,
+                "defect_reason": line.defect_reason, "notes": line.notes,
+                "car_number": line.car_number, "car_weight": line.car_weight,
+            }
+            rows[pt] = _deep_jsonable(row)
+        values["rows"] = rows
+        if unit in SOP_BULK_UNITS and hasattr(entry, "bulk_log") and entry.bulk_log:
+            b = entry.bulk_log
+            values["bulk_log"] = {
+                "exp_trucks": b.exp_trucks, "dom_trucks": b.dom_trucks,
+                "std_trucks": b.std_trucks, "nc_trucks": b.nc_trucks,
+            }
+    elif unit in ("GCC1", "GCC2"):
+        colors = {}
+        for c in GCCColor:
+            row = entry.gcc_rows.filter(color=c.value).first()
+            colors[c.value] = {
+                "bb": row.bb if row else 0,
+                "defect_reason": row.defect_reason if row else "",
+                "note": row.note if row else "",
+            }
+        values["colors"] = colors
+        summary = getattr(entry, "gcc_summary", None)
+        values["sb"] = _num(summary.sb) if summary else 0
+        values["nc"] = _num(summary.nc) if summary else 0
+    elif unit == "LOADING":
+        rows = {}
+        for pt in LoadingProductType:
+            line = entry.loading_line_items.filter(product_type=pt).first()
+            rows[pt] = {"exp": line.exp if line else 0, "dom": line.dom if line else 0}
+        values["rows"] = rows
+    elif unit == "DCP":
+        bb = getattr(entry, "dcp_bb", None)
+        sb = getattr(entry, "dcp_sb", None)
+        as_row = getattr(entry, "dcp_as", None)
+        tests = getattr(entry, "dcp_tests", None)
+        values["bb"] = (
+            {"green": bb.green, "yellow": bb.yellow, "green_yellow": bb.green_yellow,
+             "blue": bb.blue, "white": bb.white, "red": bb.red, "note": bb.note}
+            if bb else {}
+        )
+        values["sb"] = (
+            {"exp": _num(sb.exp), "dom": _num(sb.dom),
+             "sb_white": _num(sb.sb_white), "note": sb.note}
+            if sb else {}
+        )
+        values["as_row"] = (
+            {"exp": _num(as_row.exp), "dom": _num(as_row.dom),
+             "sb_white": _num(as_row.sb_white), "note": as_row.note}
+            if as_row else {}
+        )
+        values["tests"] = (
+            {"lab_test": tests.lab_test, "floor_test": tests.floor_test}
+            if tests else {}
+        )
+        w, n = [], []
+        for line in entry.dcp_reason_lines.all():
+            item = {"reason_id": line.reason_id, "qty": line.qty}
+            if line.reason.category == DCPReasonCategory.WHITE:
+                w.append(item)
+            else:
+                n.append(item)
+        values["white_reasons"] = w
+        values["nc_reasons"] = n
+    elif unit in ("PA", "SA"):
+        values["values"] = {
+            str(item.packing_type_id): _num(item.value)
+            for item in entry.packing_items.all()
+        }
+    return _deep_jsonable(values)
 
 
 class MeAPIView(APIView):
@@ -571,19 +739,30 @@ class PackingEntryCreateAPIView(APIView):
 
 class EntryDetailAPIView(APIView):
     """
-    GET /api/entries/<pk>/
-    تفاصيل إدخال موجود (أي وحدة) باستخدام نفس entry_tables() المستخدمة على الويب -
-    فأي حقل جديد يتضاف للموديل يظهر هنا تلقائيًا من غير أي تعديل.
+    GET/PUT/DELETE /api/entries/<pk>/
+    GET: تفاصيل الإدخال (أي وحدة) بنفس entry_tables() المستخدمة على الويب +
+         values بنفس شكل create payloads عشان شاشة التعديل.
+    PUT: تعديل الإدخال — نفس فورمز الويب والتحقق بتاعهم + نسخة في EntryRevision.
+    DELETE: حذف الإدخال (لو المدير أو صاحب الإدخال).
     """
 
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, pk):
+    def _get_entry(self, request, pk):
         try:
             entry = ShiftEntry.objects.select_related("submitted_by").get(pk=pk)
         except ShiftEntry.DoesNotExist:
-            return Response({"detail": "غير موجود."}, status=404)
+            return None, None
+        u = request.user
+        can_edit = u.is_manager or entry.submitted_by == u
+        if not (can_edit or entry.unit == u.assigned_unit):
+            return entry, None  # يظهر لصاحب الوحدة للعرض بس
+        return entry, can_edit
 
+    def get(self, request, pk):
+        entry, can_edit = self._get_entry(request, pk)
+        if entry is None:
+            return Response({"detail": "غير موجود."}, status=404)
         u = request.user
         if not (u.is_manager or entry.submitted_by == u or entry.unit == u.assigned_unit):
             return Response({"detail": "لا تملك صلاحية عرض هذا الإدخال."}, status=403)
@@ -600,6 +779,115 @@ class EntryDetailAPIView(APIView):
                 "submitted_by": entry.submitted_by.get_full_name() or entry.submitted_by.username,
                 "general_notes": entry.general_notes,
                 "sections": _deep_jsonable(sections),
+                "values": entry_edit_values(entry),
+                "can_edit": can_edit,
+                "can_delete": can_edit,
+            }
+        )
+
+    def put(self, request, pk):
+        entry, can_edit = self._get_entry(request, pk)
+        if entry is None:
+            return Response({"detail": "غير موجود."}, status=404)
+        if not can_edit:
+            return Response({"detail": "لا تملك صلاحية تعديل هذا الإدخال."}, status=403)
+
+        unit = entry.unit
+        data = _build_payload_qd(unit, request.data)
+        ctx = _build_all_forms(unit, data, entry=entry)
+        if not all(f.is_valid() for f in _flatten_forms(ctx)):
+            errors = {"shift": ctx["shift_form"].errors}
+            if ctx.get("gcc_color_forms"):
+                errors["colors"] = {r["color"]: r["form"].errors for r in ctx["gcc_color_forms"]}
+            if ctx.get("rows"):
+                errors["rows"] = [r["form"].errors for r in ctx["rows"]]
+            if ctx.get("bulk_form"):
+                errors["bulk_log"] = ctx["bulk_form"].errors
+            if ctx.get("dcp"):
+                for k, f in ctx["dcp"].items():
+                    errors[k] = f.errors
+            if ctx.get("pa_table"):
+                errors["packing"] = ctx["pa_table"].errors or ctx["sa_table"].errors
+            return Response({"detail": "بيانات غير صحيحة.", "errors": errors}, status=400)
+
+        try:
+            with transaction.atomic():
+                snapshot = snapshot_entry(entry)
+                ctx["shift_form"].save()
+                _save_related(entry, data)
+                EntryRevision.objects.create(
+                    shift_entry=entry,
+                    edited_by=request.user,
+                    data=snapshot,
+                )
+        except ValidationError as exc:
+            return Response({"detail": exc.message}, status=400)
+
+        return Response(
+            {"id": entry.pk, "shift": entry.shift, "entry_date": str(entry.entry_date)},
+            status=200,
+        )
+
+    def delete(self, request, pk):
+        entry, can_edit = self._get_entry(request, pk)
+        if entry is None:
+            return Response({"detail": "غير موجود."}, status=404)
+        if not can_edit:
+            return Response({"detail": "لا تملك صلاحية حذف هذا الإدخال."}, status=403)
+        entry.delete()
+        return Response(status=204)
+
+
+class EntriesListAPIView(APIView):
+    """GET /api/entries/ — سجل الإدخالات بنفس فلاتر صفحة records الويب:
+    unit / from / to + صفحة اختيارية (page, page_size)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        u = request.user
+        qs = ShiftEntry.objects.select_related("submitted_by")
+        if not u.is_manager:
+            qs = qs.filter(unit=u.assigned_unit)
+        unit = request.query_params.get("unit") or ""
+        date_from = request.query_params.get("from") or ""
+        date_to = request.query_params.get("to") or ""
+        if unit:
+            qs = qs.filter(unit=unit)
+        try:
+            if date_from:
+                qs = qs.filter(entry_date__gte=date_from)
+            if date_to:
+                qs = qs.filter(entry_date__lte=date_to)
+        except (ValueError, ValidationError):
+            date_from = date_to = ""
+        qs = qs.order_by("-entry_date", "shift", "-pk")
+
+        page = request.query_params.get("page")
+        page_size = int(request.query_params.get("page_size", "50"))
+        total = qs.count()
+        if page:
+            start = (int(page) - 1) * page_size
+            rows = qs[start:start + page_size]
+        else:
+            rows = qs[:page_size]
+
+        return Response(
+            {
+                "total": total,
+                "entries": [
+                    {
+                        "id": e.pk,
+                        "entry_date": e.entry_date.isoformat(),
+                        "shift": e.shift,
+                        "shift_label": e.get_shift_display(),
+                        "unit": e.unit,
+                        "unit_label": unit_label(e.unit),
+                        "submitted_by": e.submitted_by.get_full_name() or e.submitted_by.username,
+                        "can_edit": u.is_manager or e.submitted_by == u,
+                    }
+                    for e in rows
+                ],
             }
         )
 
