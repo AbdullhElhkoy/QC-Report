@@ -23,6 +23,7 @@ urlpatterns = [
     # ---- Entry detail (generic, any unit) + قائمة السجل ----
     path("entries/", api_views.EntriesListAPIView.as_view(), name="api_entries"),
     path("entries/<int:pk>/", api_views.EntryDetailAPIView.as_view(), name="api_entry_detail"),
+    path("entries/<int:pk>/history/", api_views.EntryHistoryAPIView.as_view(), name="api_entry_history"),
     # ---- Reports ----
     path("reports/daily/<date:date>/", api_views.DailyReportAPIView.as_view(), name="api_report_daily"),
     path("reports/shift/<date:date>/<str:shift>/", api_views.ShiftReportAPIView.as_view(), name="api_report_shift"),

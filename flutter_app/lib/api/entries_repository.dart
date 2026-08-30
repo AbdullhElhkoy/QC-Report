@@ -1,5 +1,30 @@
 import 'api_client.dart';
 
+/// سجل التعديلات لبيان إدخال معين (نسخ قبل كل تعديل).
+class EntryHistoryItem {
+  final String editedBy;
+  final String editedAt;
+  final String notes;
+  final List<Map<String, dynamic>> sections;
+
+  EntryHistoryItem({
+    required this.editedBy,
+    required this.editedAt,
+    required this.notes,
+    required this.sections,
+  });
+
+  factory EntryHistoryItem.fromJson(Map<String, dynamic> json) => EntryHistoryItem(
+        editedBy: json["edited_by"]?.toString() ?? "",
+        editedAt: json["edited_at"]?.toString() ?? "",
+        notes: json["notes"]?.toString() ?? "",
+        sections: [
+          for (final s in (json["sections"] as List? ?? const []))
+            Map<String, dynamic>.from(s as Map),
+        ],
+      );
+}
+
 /// مستودع الإدخالات: كل وحدة ليها دالة تبني الـ body الصحيح وتنبط على endpoint الصح.
 class EntriesRepository {
   dynamic _err(dynamic res) => throw Exception(ApiClient.extractError(res.data));
@@ -127,5 +152,12 @@ class EntriesRepository {
   Future<void> deleteEntry(int id) async {
     final res = await ApiClient.instance.dio.delete("/api/entries/$id/");
     if (res.statusCode != 204) _err(res);
+  }
+
+  /// سجل التعديلات لبيان واحد (نسخ قبل كل تعديل).
+  Future<Map<String, dynamic>> entryHistory(int id) async {
+    final res = await ApiClient.instance.dio.get("/api/entries/$id/history/");
+    if (res.statusCode != 200) _err(res);
+    return Map<String, dynamic>.from(res.data);
   }
 }

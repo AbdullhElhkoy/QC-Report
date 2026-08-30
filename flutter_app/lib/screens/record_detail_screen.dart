@@ -4,6 +4,7 @@ import '../api/api_client.dart';
 import '../api/entries_repository.dart';
 import '../theme.dart';
 import '../widgets/app_scaffold.dart';
+import 'entry_history_screen.dart';
 import 'records_screen.dart';
 
 /// عرض تفاصيل إدخال (قراءة فقط) — نفس شاشة الويب record_detail.html.
@@ -192,7 +193,37 @@ class _RecordDetailScreenState extends State<RecordDetailScreen> {
                               },
                             ),
                           ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: OutlinedButton.icon(
+                              icon: const Icon(Icons.history),
+                              label: const Text("سجل التعديلات"),
+                              onPressed: () {
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => EntryHistoryScreen(
+                                        id: widget.id,
+                                        unitLabel: "${d["unit_label"]}"),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
                         ],
+                      )
+                    else
+                      OutlinedButton.icon(
+                        icon: const Icon(Icons.history),
+                        label: const Text("سجل التعديلات"),
+                        onPressed: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => EntryHistoryScreen(
+                                  id: widget.id,
+                                  unitLabel: "${d["unit_label"]}"),
+                            ),
+                          );
+                        },
                       ),
                   ],
                 ),

@@ -15,6 +15,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.http import QueryDict
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -50,6 +51,7 @@ from .forms import (
 from .views import (
     _build_all_forms,
     _flatten_forms,
+    _revision_sections,
     _save_related,
     entry_tables,
     gcc_color_form,
@@ -914,3 +916,44 @@ class ShiftReportAPIView(APIView):
             return Response({"detail": "تقرير الوردية متاح للمدير فقط."}, status=403)
         report = full_shift_report(date, shift)
         return Response(_deep_jsonable(report))
+
+
+class EntryHistoryAPIView(APIView):
+    """GET /api/entries/<pk>/history/ -> سجل التعديلات (نسخ قبل كل تعديل).
+
+    متاح للمدير أو صاحب الإدخال، زي صفحة الويب entry_history."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        entry = get_object_or_404(
+            ShiftEntry.objects.select_related("submitted_by"), pk=pk
+        )
+        if not (request.user.is_manager or entry.submitted_by == request.user):
+            return Response({"detail": "لا تملك صلاحية عرض سجل التعديلات."}, status=403)
+        revisions = entry.revisions.select_related("edited_by").order_by("edited_at")
+        history = []
+        for rev in revisions:
+            who = (
+                rev.edited_by.get_full_name() or rev.edited_by.username
+                if rev.edited_by
+                else ""
+            )
+            history.append(
+                {
+                    "edited_by": who,
+                    "edited_at": rev.edited_at.isoformat() if rev.edited_at else "",
+                    "notes": (rev.data or {}).get("general_notes") or "",
+                    "sections": _revision_sections(rev.data or {}),
+                }
+            )
+        return Response(
+            {
+                "pk": entry.pk,
+                "unit": entry.unit,
+                "unit_label": unit_label(entry.unit),
+                "entry_date": str(entry.entry_date),
+                "shift": entry.shift,
+                "shift_label": entry.get_shift_display(),
+                "history": history,
+            }
+        )
