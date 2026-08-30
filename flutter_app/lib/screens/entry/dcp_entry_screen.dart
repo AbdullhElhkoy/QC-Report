@@ -15,7 +15,8 @@ class _ReasonPick {
 }
 
 class DcpEntryScreen extends StatefulWidget {
-  const DcpEntryScreen({super.key});
+  final int? editId;
+  const DcpEntryScreen({super.key, this.editId});
 
   @override
   State<DcpEntryScreen> createState() => _DcpEntryScreenState();
@@ -56,7 +57,15 @@ class _DcpEntryScreenState extends State<DcpEntryScreen> {
   bool _saving = false;
   EntryStatus? _status;
   String? _userName;
+  String? _date;
+  String? _shiftLabel;
   String? _error;
+
+  bool get _editing => widget.editId != null;
+
+  void _setNum(Map<String, NumberField> map, String key, dynamic v) {
+    if (v != null) map[key]!.controller.text = "$v".replaceFirst(RegExp(r"\.0+$"), "");
+  }
 
   num get _totalExp =>
       _bb["green"]!.value() +
@@ -84,6 +93,65 @@ class _DcpEntryScreenState extends State<DcpEntryScreen> {
   }
 
   Future<void> _load() async {
+    if (widget.editId != null) {
+      try {
+        final results = await Future.wait([
+          _entries.entryDetail(widget.editId!),
+          _entries.dcpReasons("white"),
+          _entries.dcpReasons("nc"),
+        ]);
+        if (!mounted) return;
+        final d = Map<String, dynamic>.from(results[0] as Map);
+        final vals = Map<String, dynamic>.from(d["values"] as Map? ?? {});
+        final bb = Map<String, dynamic>.from(vals["bb"] as Map? ?? {});
+        final sb = Map<String, dynamic>.from(vals["sb"] as Map? ?? {});
+        final asRow = Map<String, dynamic>.from(vals["as_row"] as Map? ?? {});
+        final tests = Map<String, dynamic>.from(vals["tests"] as Map? ?? {});
+        for (final k in ["green", "yellow", "green_yellow", "blue", "white", "red"]) {
+          _setNum(_bb, k, bb[k]);
+        }
+        _bbNote.text = "${bb["note"] ?? ""}";
+        for (final k in ["exp", "dom", "sb_white"]) {
+          _setNum(_sb, k, sb[k]);
+          _setNum(_asRow, k, asRow[k]);
+        }
+        _sbNote.text = "${sb["note"] ?? ""}";
+        _asNote.text = "${asRow["note"] ?? ""}";
+        for (final k in ["lab_test", "floor_test"]) {
+          _setNum(_tests, k, tests[k]);
+        }
+        final savedWhite = {
+          for (final r in (vals["white_reasons"] as List? ?? const []))
+            (r["reason_id"] as int): r["qty"]
+        };
+        final savedNc = {
+          for (final r in (vals["nc_reasons"] as List? ?? const []))
+            (r["reason_id"] as int): r["qty"]
+        };
+        _whiteReasons = [
+          for (final r in results[1] as List)
+            _ReasonPick(id: r["id"], name: r["name"])
+              ..qty.text = "${savedWhite[r["id"]] ?? 0}"
+        ];
+        _ncReasons = [
+          for (final r in results[2] as List)
+            _ReasonPick(id: r["id"], name: r["name"])
+              ..qty.text = "${savedNc[r["id"]] ?? 0}"
+        ];
+        setState(() {
+          _date = d["entry_date"] as String?;
+          _shiftLabel = d["shift_label"] as String?;
+          _userName = d["submitted_by"] as String?;
+          _loading = false;
+        });
+      } catch (e) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+      return;
+    }
     try {
       final results = await Future.wait([
         AuthRepository().entryStatus("DCP"),
@@ -122,25 +190,37 @@ class _DcpEntryScreenState extends State<DcpEntryScreen> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      await _entries.createDcp(
-        bb: ({for (final e in _bb.entries) e.key: e.value.value()})
+      final payload = <String, dynamic>{
+        "bb": (<String, dynamic>{for (final e in _bb.entries) e.key: e.value.value()})
           ..["note"] = _bbNote.text.trim(),
-        sb: ({for (final e in _sb.entries) e.key: e.value.value()})
+        "sb": (<String, dynamic>{for (final e in _sb.entries) e.key: e.value.value()})
           ..["note"] = _sbNote.text.trim(),
-        asRow: ({for (final e in _asRow.entries) e.key: e.value.value()})
+        "as_row": (<String, dynamic>{for (final e in _asRow.entries) e.key: e.value.value()})
           ..["note"] = _asNote.text.trim(),
-        tests: ({for (final e in _tests.entries) e.key: e.value.value()}),
-        whiteReasons: [
+        "tests": (<String, dynamic>{for (final e in _tests.entries) e.key: e.value.value()}),
+        "white_reasons": [
           for (final r in (_whiteReasons ?? <_ReasonPick>[]))
             if ((num.tryParse(r.qty.text.trim()) ?? 0) > 0)
               {"reason_id": r.id, "qty": num.parse(r.qty.text.trim())}
         ],
-        ncReasons: [
+        "nc_reasons": [
           for (final r in (_ncReasons ?? <_ReasonPick>[]))
             if ((num.tryParse(r.qty.text.trim()) ?? 0) > 0)
               {"reason_id": r.id, "qty": num.parse(r.qty.text.trim())}
         ],
-      );
+      };
+      if (_editing) {
+        await _entries.updateEntry(widget.editId!, payload);
+      } else {
+        await _entries.createDcp(
+          bb: payload["bb"] as Map<String, dynamic>,
+          sb: payload["sb"] as Map<String, dynamic>,
+          asRow: payload["as_row"] as Map<String, dynamic>,
+          tests: payload["tests"] as Map<String, dynamic>,
+          whiteReasons: payload["white_reasons"] as List<Map<String, dynamic>>,
+          ncReasons: payload["nc_reasons"] as List<Map<String, dynamic>>,
+        );
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text("تم الحفظ ✅")));
@@ -188,8 +268,8 @@ class _DcpEntryScreenState extends State<DcpEntryScreen> {
           children: [
             _headerCell("الموظف", _userName ?? "-"),
             _headerCell("الوحدة", "DCP"),
-            _headerCell("التاريخ", _status?.date ?? "-"),
-            _headerCell("الوردية", _status?.shiftLabel ?? "-"),
+            _headerCell("التاريخ", _date ?? _status?.date ?? "-"),
+            _headerCell("الوردية", _shiftLabel ?? _status?.shiftLabel ?? "-"),
           ],
         ),
       ),
@@ -317,7 +397,7 @@ class _DcpEntryScreenState extends State<DcpEntryScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: "DCP — إدخال",
+      title: _editing ? "DCP — تعديل" : "DCP — إدخال",
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : (_status?.allShiftsDoneToday ?? false)

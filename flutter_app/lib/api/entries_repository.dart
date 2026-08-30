@@ -91,4 +91,41 @@ class EntriesRepository {
         {"id": t["id"], "name": t["name"]}
     ];
   }
+
+  // ---- السجل (عرض/تعديل/حذف) ----
+
+  /// سجل الإدخالات بنفس فلاتر صفحة الويب: unit / from / to.
+  Future<Map<String, dynamic>> listEntries(
+      {String? unit, String? from, String? to, int? page}) async {
+    final res = await ApiClient.instance.dio.get(
+      "/api/entries/",
+      queryParameters: {
+        if (unit != null && unit.isNotEmpty) "unit": unit,
+        if (from != null && from.isNotEmpty) "from": from,
+        if (to != null && to.isNotEmpty) "to": to,
+        if (page != null) "page": page,
+      },
+    );
+    if (res.statusCode != 200) _err(res);
+    return Map<String, dynamic>.from(res.data);
+  }
+
+  /// تفاصيل إدخال (+ القيم الحالية جاهزة للتعديل pre-fill).
+  Future<Map<String, dynamic>> entryDetail(int id) async {
+    final res = await ApiClient.instance.dio.get("/api/entries/$id/");
+    if (res.statusCode != 200) _err(res);
+    return Map<String, dynamic>.from(res.data);
+  }
+
+  /// تعديل إدخال — نفس شكل الـ create payload.
+  Future<void> updateEntry(int id, Map<String, dynamic> payload) async {
+    final res = await ApiClient.instance.dio.put("/api/entries/$id/", data: payload);
+    if (res.statusCode != 200) _err(res);
+  }
+
+  /// حذف إدخال نهائي.
+  Future<void> deleteEntry(int id) async {
+    final res = await ApiClient.instance.dio.delete("/api/entries/$id/");
+    if (res.statusCode != 204) _err(res);
+  }
 }

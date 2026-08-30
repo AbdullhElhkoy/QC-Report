@@ -30,9 +30,10 @@ const List<String> kBulkUnits = ["SOP_A", "SOP_B", "SOP_C", "SOP_D"];
 class SopEntryScreen extends StatefulWidget {
   final String unit;
   final String unitLabel;
+  final int? editId;
 
   const SopEntryScreen(
-      {super.key, required this.unit, required this.unitLabel});
+      {super.key, required this.unit, required this.unitLabel, this.editId});
 
   @override
   State<SopEntryScreen> createState() => _SopEntryScreenState();
@@ -73,7 +74,45 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
   bool _saving = false;
   EntryStatus? _status;
   String? _userName;
+  String? _date;
+  String? _shiftLabel;
   String? _error;
+
+  bool get _editing => widget.editId != null;
+
+  void _prefill(Map<String, dynamic> vals) {
+    final rows = Map<String, dynamic>.from(vals["rows"] as Map? ?? {});
+    for (final pt in _products) {
+      final row = Map<String, dynamic>.from(rows[pt] as Map? ?? {});
+      final f = _fields[pt]!;
+      for (final key in ["exp", "dom", "std", "nc"]) {
+        final v = row[key];
+        if (v != null && f[key] is NumberField) {
+          (f[key] as NumberField).controller.text =
+              "$v".replaceFirst(RegExp(r"\.0+$"), "");
+        }
+      }
+      for (final key in ["cause", "note", "defect_reason", "notes"]) {
+        final v = row[key];
+        if (v != null && f[key] is TextEditingController) {
+          (f[key] as TextEditingController).text = "$v";
+        }
+      }
+      for (final key in ["car_number", "car_weight"]) {
+        final v = row[key];
+        if (v != null && f[key] is NumberField) {
+          (f[key] as NumberField).controller.text =
+              "$v".replaceFirst(RegExp(r"\.0+$"), "");
+        }
+      }
+    }
+    final bulk = Map<String, dynamic>.from(vals["bulk_log"] as Map? ?? {});
+    for (final e in _bulk.entries) {
+      final v = bulk[e.key];
+      if (v != null) e.value.controller.text = "$v";
+    }
+    _generalNotes.text = "${vals["general_notes"] ?? ""}";
+  }
 
   @override
   void initState() {
@@ -82,6 +121,25 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
   }
 
   Future<void> _load() async {
+    if (widget.editId != null) {
+      try {
+        final d = await _entries.entryDetail(widget.editId!);
+        if (!mounted) return;
+        _prefill(Map<String, dynamic>.from(d["values"] as Map? ?? {}));
+        setState(() {
+          _date = d["entry_date"] as String?;
+          _shiftLabel = d["shift_label"] as String?;
+          _userName = d["submitted_by"] as String?;
+          _loading = false;
+        });
+      } catch (e) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+      return;
+    }
     try {
       final results = await Future.wait([
         AuthRepository().entryStatus(widget.unit),
@@ -126,14 +184,23 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
           if (pt == "BULK") "car_weight": _numVal(f["car_weight"]),
         };
       }
-      await _entries.createSop(
-        widget.unit,
-        rows,
-        generalNotes: _generalNotes.text.trim(),
-        bulkLog: kBulkUnits.contains(widget.unit)
-            ? {for (final e in _bulk.entries) e.key: e.value.value()}
-            : null,
-      );
+      if (_editing) {
+        await _entries.updateEntry(widget.editId!, {
+          "general_notes": _generalNotes.text.trim(),
+          "rows": rows,
+          if (kBulkUnits.contains(widget.unit))
+            "bulk_log": {for (final e in _bulk.entries) e.key: e.value.value()},
+        });
+      } else {
+        await _entries.createSop(
+          widget.unit,
+          rows,
+          generalNotes: _generalNotes.text.trim(),
+          bulkLog: kBulkUnits.contains(widget.unit)
+              ? {for (final e in _bulk.entries) e.key: e.value.value()}
+              : null,
+        );
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text("تم الحفظ ✅ — سجل الوردية اللي بعدها أو ارجع.")));
@@ -170,8 +237,8 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
           children: [
             cell("الموظف", _userName ?? "-"),
             cell("الوحدة", widget.unitLabel),
-            cell("التاريخ", _status?.date ?? "-"),
-            cell("الوردية", _status?.shiftLabel ?? "-"),
+            cell("التاريخ", _date ?? _status?.date ?? "-"),
+            cell("الوردية", _shiftLabel ?? _status?.shiftLabel ?? "-"),
           ],
         ),
       ),
@@ -301,7 +368,9 @@ class _SopEntryScreenState extends State<SopEntryScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: "${widget.unitLabel} — إدخال",
+      title: _editing
+          ? "${widget.unitLabel} — تعديل"
+          : "${widget.unitLabel} — إدخال",
       body: _loading
           ? const Center(child: CircularProgressIndicator())
 : _status != null && _status!.allShiftsDoneToday

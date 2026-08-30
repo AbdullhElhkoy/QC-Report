@@ -12,7 +12,8 @@ const List<String> kLoadingProducts = [
 ];
 
 class LoadingEntryScreen extends StatefulWidget {
-  const LoadingEntryScreen({super.key});
+  final int? editId;
+  const LoadingEntryScreen({super.key, this.editId});
 
   @override
   State<LoadingEntryScreen> createState() => _LoadingEntryScreenState();
@@ -31,7 +32,22 @@ class _LoadingEntryScreenState extends State<LoadingEntryScreen> {
   bool _saving = false;
   EntryStatus? _status;
   String? _userName;
+  String? _date;
+  String? _shiftLabel;
   String? _error;
+
+  bool get _editing => widget.editId != null;
+
+  void _prefill(Map<String, dynamic> vals) {
+    final rows = Map<String, dynamic>.from(vals["rows"] as Map? ?? {});
+    for (final pt in kLoadingProducts) {
+      final row = Map<String, dynamic>.from(rows[pt] as Map? ?? {});
+      _fields[pt]!["exp"]!.controller.text =
+          "${row["exp"] ?? 0}".replaceFirst(RegExp(r"\.0+$"), "");
+      _fields[pt]!["dom"]!.controller.text =
+          "${row["dom"] ?? 0}".replaceFirst(RegExp(r"\.0+$"), "");
+    }
+  }
 
   @override
   void initState() {
@@ -40,6 +56,25 @@ class _LoadingEntryScreenState extends State<LoadingEntryScreen> {
   }
 
   Future<void> _load() async {
+    if (widget.editId != null) {
+      try {
+        final d = await _entries.entryDetail(widget.editId!);
+        if (!mounted) return;
+        _prefill(Map<String, dynamic>.from(d["values"] as Map? ?? {}));
+        setState(() {
+          _date = d["entry_date"] as String?;
+          _shiftLabel = d["shift_label"] as String?;
+          _userName = d["submitted_by"] as String?;
+          _loading = false;
+        });
+      } catch (e) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+      return;
+    }
     try {
       final results = await Future.wait([
         AuthRepository().entryStatus("LOADING"),
@@ -62,10 +97,15 @@ class _LoadingEntryScreenState extends State<LoadingEntryScreen> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      await _entries.createLoading({
+      final rows = {
         for (final pt in kLoadingProducts)
           pt: {for (final e in _fields[pt]!.entries) e.key: e.value.value()},
-      });
+      };
+      if (_editing) {
+        await _entries.updateEntry(widget.editId!, {"rows": rows});
+      } else {
+        await _entries.createLoading(rows);
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text("تم الحفظ ✅")));
@@ -105,8 +145,8 @@ class _LoadingEntryScreenState extends State<LoadingEntryScreen> {
           children: [
             _headerCell("الموظف", _userName ?? "-"),
             _headerCell("الوحدة", "LOADING"),
-            _headerCell("التاريخ", _status?.date ?? "-"),
-            _headerCell("الوردية", _status?.shiftLabel ?? "-"),
+            _headerCell("التاريخ", _date ?? _status?.date ?? "-"),
+            _headerCell("الوردية", _shiftLabel ?? _status?.shiftLabel ?? "-"),
           ],
         ),
       ),
@@ -163,7 +203,7 @@ class _LoadingEntryScreenState extends State<LoadingEntryScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: "Loading — إدخال",
+      title: _editing ? "Loading — تعديل" : "Loading — إدخال",
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : (_status?.allShiftsDoneToday ?? false)

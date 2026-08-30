@@ -9,8 +9,9 @@ import '../../widgets/number_field.dart';
 
 class GccEntryScreen extends StatefulWidget {
   final String unit; // GCC1 / GCC2
+  final int? editId;
 
-  const GccEntryScreen({super.key, required this.unit});
+  const GccEntryScreen({super.key, required this.unit, this.editId});
 
   @override
   State<GccEntryScreen> createState() => _GccEntryScreenState();
@@ -44,7 +45,23 @@ class _GccEntryScreenState extends State<GccEntryScreen> {
   bool _saving = false;
   EntryStatus? _status;
   String? _userName;
+  String? _date;
+  String? _shiftLabel;
   String? _error;
+
+  bool get _editing => widget.editId != null;
+
+  void _prefill(Map<String, dynamic> vals) {
+    final colors = (vals["colors"] as Map? ?? {});
+    for (final c in kGccColors) {
+      final row = Map<String, dynamic>.from(colors[c.$1] as Map? ?? {});
+      _bb[c.$1]!.controller.text = "${row["bb"] ?? 0}";
+      _reasons[c.$1]!.text = "${row["defect_reason"] ?? ""}";
+      _notes[c.$1]!.text = "${row["note"] ?? ""}";
+    }
+    _sb.controller.text = "${vals["sb"] ?? 0}";
+    _nc.controller.text = "${vals["nc"] ?? 0}";
+  }
 
   @override
   void initState() {
@@ -66,6 +83,25 @@ class _GccEntryScreenState extends State<GccEntryScreen> {
   }
 
   Future<void> _load() async {
+    if (widget.editId != null) {
+      try {
+        final d = await _entries.entryDetail(widget.editId!);
+        if (!mounted) return;
+        _prefill(Map<String, dynamic>.from(d["values"] as Map? ?? {}));
+        setState(() {
+          _date = d["entry_date"] as String?;
+          _shiftLabel = d["shift_label"] as String?;
+          _userName = d["submitted_by"] as String?;
+          _loading = false;
+        });
+      } catch (e) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+      return;
+    }
     try {
       final results = await Future.wait([
         AuthRepository().entryStatus(widget.unit),
@@ -88,19 +124,24 @@ class _GccEntryScreenState extends State<GccEntryScreen> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      await _entries.createGcc(
-        widget.unit,
-        {
-          for (final c in kGccColors)
-            c.$1: {
-              "bb": _bb[c.$1]!.value(),
-              "defect_reason": _reasons[c.$1]!.text.trim(),
-              "note": _notes[c.$1]!.text.trim(),
-            }
-        },
-        sb: _sb.value(),
-        nc: _nc.value(),
-      );
+      final colors = <String, Map<String, dynamic>>{
+        for (final c in kGccColors)
+          c.$1: {
+            "bb": _bb[c.$1]!.value(),
+            "defect_reason": _reasons[c.$1]!.text.trim(),
+            "note": _notes[c.$1]!.text.trim(),
+          }
+      };
+      if (_editing) {
+        await _entries.updateEntry(widget.editId!, {
+          "colors": colors,
+          "sb": _sb.value(),
+          "nc": _nc.value(),
+        });
+      } else {
+        await _entries.createGcc(widget.unit, colors,
+            sb: _sb.value(), nc: _nc.value());
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("تم الحفظ ✅")));
@@ -140,8 +181,8 @@ class _GccEntryScreenState extends State<GccEntryScreen> {
           children: [
             _headerCell("الموظف", _userName ?? "-"),
             _headerCell("الوحدة", widget.unit),
-            _headerCell("التاريخ", _status?.date ?? "-"),
-            _headerCell("الوردية", _status?.shiftLabel ?? "-"),
+            _headerCell("التاريخ", _date ?? _status?.date ?? "-"),
+            _headerCell("الوردية", _shiftLabel ?? _status?.shiftLabel ?? "-"),
           ],
         ),
       ),
@@ -151,7 +192,7 @@ class _GccEntryScreenState extends State<GccEntryScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: "${widget.unit} — إدخال",
+      title: _editing ? "${widget.unit} — تعديل" : "${widget.unit} — إدخال",
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : (_status?.allShiftsDoneToday ?? false)

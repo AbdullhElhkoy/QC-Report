@@ -10,8 +10,9 @@ import '../../widgets/number_field.dart';
 /// PA / SA: جدول ديناميكي — الأنواع من الإعدادات، TOTAL حي في الشاشة.
 class PackingEntryScreen extends StatefulWidget {
   final String unit; // PA / SA
+  final int? editId;
 
-  const PackingEntryScreen({super.key, required this.unit});
+  const PackingEntryScreen({super.key, required this.unit, this.editId});
 
   @override
   State<PackingEntryScreen> createState() => _PackingEntryScreenState();
@@ -24,16 +25,31 @@ class _PackingEntryScreenState extends State<PackingEntryScreen> {
   bool _saving = false;
   EntryStatus? _status;
   String? _userName;
+  String? _date;
+  String? _shiftLabel;
   String? _error;
+
+  bool get _editing => widget.editId != null;
+
+  void _prefill(Map<String, dynamic> vals) {
+    final saved = Map<String, dynamic>.from(vals["values"] as Map? ?? {});
+    for (final t in _types ?? const <(int, String, NumberField)>[]) {
+      final v = saved["${t.$1}"];
+      if (v != null) {
+        final s = "$v".replaceFirst(RegExp(r"\.0+$"), "");
+        t.$3.controller.text = s;
+      }
+    }
+  }
+
+  void _recalc() {
+    if (mounted) setState(() {});
+  }
 
   @override
   void initState() {
     super.initState();
     _load();
-  }
-
-  void _recalc() {
-    if (mounted) setState(() {});
   }
 
   num get _total {
@@ -45,6 +61,36 @@ class _PackingEntryScreenState extends State<PackingEntryScreen> {
   }
 
   Future<void> _load() async {
+    if (widget.editId != null) {
+      try {
+        final d = await _entries.entryDetail(widget.editId!);
+        if (!mounted) return;
+        final types = await _entries.packingTypes(widget.unit);
+        if (!mounted) return;
+        setState(() {
+          _types = [
+            for (final t in types)
+              (
+                t["id"] as int,
+                t["name"] as String,
+                NumberField.zero(
+                    label: t["name"], allowDecimal: true, onChanged: _recalc)
+              )
+          ];
+          _prefill(Map<String, dynamic>.from(d["values"] as Map? ?? {}));
+          _date = d["entry_date"] as String?;
+          _shiftLabel = d["shift_label"] as String?;
+          _userName = d["submitted_by"] as String?;
+          _loading = false;
+        });
+      } catch (e) {
+        setState(() {
+          _error = e.toString();
+          _loading = false;
+        });
+      }
+      return;
+    }
     try {
       final results = await Future.wait([
         AuthRepository().entryStatus(widget.unit),
@@ -77,9 +123,14 @@ class _PackingEntryScreenState extends State<PackingEntryScreen> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
-      await _entries.createPacking(widget.unit, {
+      final values = {
         for (final (id, _, f) in _types!) id.toString(): f.value(),
-      });
+      };
+      if (_editing) {
+        await _entries.updateEntry(widget.editId!, {"values": values});
+      } else {
+        await _entries.createPacking(widget.unit, values);
+      }
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text("تم الحفظ ✅")));
@@ -119,8 +170,8 @@ class _PackingEntryScreenState extends State<PackingEntryScreen> {
           children: [
             _headerCell("الموظف", _userName ?? "-"),
             _headerCell("الوحدة", widget.unit),
-            _headerCell("التاريخ", _status?.date ?? "-"),
-            _headerCell("الوردية", _status?.shiftLabel ?? "-"),
+            _headerCell("التاريخ", _date ?? _status?.date ?? "-"),
+            _headerCell("الوردية", _shiftLabel ?? _status?.shiftLabel ?? "-"),
           ],
         ),
       ),
@@ -211,7 +262,7 @@ class _PackingEntryScreenState extends State<PackingEntryScreen> {
   @override
   Widget build(BuildContext context) {
     return AppScaffold(
-      title: "${widget.unit} — إدخال",
+      title: _editing ? "${widget.unit} — تعديل" : "${widget.unit} — إدخال",
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : (_status?.allShiftsDoneToday ?? false)

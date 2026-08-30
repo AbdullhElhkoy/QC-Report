@@ -9,6 +9,7 @@ import 'entry/loading_entry_screen.dart';
 import 'entry/packing_entry_screen.dart';
 import 'entry/sop_entry_screen.dart';
 import 'login_screen.dart';
+import 'records_screen.dart';
 import 'reports/daily_report_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -143,6 +144,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       );
                     },
                   ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    icon: const Icon(Icons.list_alt_outlined),
+                    label: const Text("سجل الإدخالات والتعديلات"),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const RecordsScreen()),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -226,6 +235,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ? null
                     : () => _open(context,
                         UnitItem(value: unit, label: widget.me.assignedUnitLabel ?? unit)),
+              ),
+            ),
+          ],
+        ),
+      ),
+      const SizedBox(height: 16),
+      Card(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _cardHeader("السجل والتعديلات"),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: OutlinedButton.icon(
+                icon: const Icon(Icons.list_alt_outlined),
+                label: const Text("سجل الإدخالات والتعديلات"),
+                onPressed: () => Navigator.of(context).push(
+                  MaterialPageRoute(builder: (_) => const RecordsScreen()),
+                ),
               ),
             ),
           ],
