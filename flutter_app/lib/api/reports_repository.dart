@@ -21,6 +21,14 @@ class ReportsRepository {
     return Map<String, dynamic>.from(res.data as Map);
   }
 
+  /// تقرير الوردية لكافة المصانع كـ JSON (مدير فقط)
+  Future<Map<String, dynamic>> shiftReport(DateTime date, String shift) async {
+    final res = await ApiClient.instance.dio
+        .get("/api/reports/shift/${_fmt(date)}/$shift/");
+    if (res.statusCode != 200) throw Exception(ApiClient.extractError(res.data));
+    return Map<String, dynamic>.from(res.data as Map);
+  }
+
   Future<Uint8List> _download(String path, Map<String, dynamic>? query) async {
     final access = await const FlutterSecureStorage().read(key: "access_token");
     final res = await Dio(BaseOptions(baseUrl: kApiBaseUrl)).get(

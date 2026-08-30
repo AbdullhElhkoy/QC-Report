@@ -25,4 +25,5 @@ urlpatterns = [
     path("entries/<int:pk>/", api_views.EntryDetailAPIView.as_view(), name="api_entry_detail"),
     # ---- Reports ----
     path("reports/daily/<date:date>/", api_views.DailyReportAPIView.as_view(), name="api_report_daily"),
+    path("reports/shift/<date:date>/<str:shift>/", api_views.ShiftReportAPIView.as_view(), name="api_report_shift"),
 ]

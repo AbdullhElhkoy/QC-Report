@@ -11,6 +11,7 @@ import 'entry/sop_entry_screen.dart';
 import 'login_screen.dart';
 import 'records_screen.dart';
 import 'reports/daily_report_screen.dart';
+import 'reports/shift_report_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   final UserModel me;
@@ -132,6 +133,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(46)),
                     onPressed: () => Navigator.of(context).push(
                       MaterialPageRoute(builder: (_) => const DailyReportScreen()),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  FilledButton.tonalIcon(
+                    icon: const Icon(Icons.nights_stay_outlined),
+                    label: const Text("تقرير الوردية"),
+                    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(46)),
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(builder: (_) => const ShiftReportScreen()),
                     ),
                   ),
                   const SizedBox(height: 8),

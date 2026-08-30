@@ -20,7 +20,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .aggregations import full_daily_report
+from .aggregations import full_daily_report, full_shift_report
 from .models import (
     DCPReason,
     DCPReasonCategory,
@@ -901,4 +901,16 @@ class DailyReportAPIView(APIView):
         if not request.user.is_manager:
             return Response({"detail": "التقرير اليومي متاح للمدير فقط."}, status=403)
         report = full_daily_report(date)
+        return Response(_deep_jsonable(report))
+
+
+class ShiftReportAPIView(APIView):
+    """GET /api/reports/shift/<date>/<shift>/ -> تقرير وردية لكل المصانع (مدير فقط)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, date, shift):
+        if not request.user.is_manager:
+            return Response({"detail": "تقرير الوردية متاح للمدير فقط."}, status=403)
+        report = full_shift_report(date, shift)
         return Response(_deep_jsonable(report))
